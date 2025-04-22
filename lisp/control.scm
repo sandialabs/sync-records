@@ -1,0 +1,37 @@
+'(lambda (record secret-hash query)
+   (define (authenticate secret)
+     (if (not (equal? secret-hash (sync-hash (expression->byte-vector secret))))
+         (error 'authentication-failure "Could not identify as self")))
+
+   (define (less? x y)
+     (cond ((and (number? x) (number? y)) (< x y))
+           ((and (number? x) (not (number? y))) #t)
+           ((and (not (number? x)) (number? y)) #f)
+           (else (string<=? (symbol->string x) (symbol->string y)))))
+
+   (define result
+     (cond ((eq? (car query) '*record*)
+            (authenticate (cadr query))
+            ((eval (caddr query)) record))
+           ((eq? (car query) '*step*)
+            (authenticate (cadr query))
+            (let ((names (cadr ((record 'get) '(control step)))))
+              (let loop ((names (sort! names less?)) (rets '()))
+                (if (null? names) (reverse rets)
+                    (let ((ret (sync-call
+                                `(*record*
+                                  ,(cadr query)
+                                  (lambda (record)
+                                    (let* ((path '(control step ,(car names)))
+                                           (expr (cadr ((record 'get) path))))
+                                      ((eval expr) record)))) #t)))
+                      (loop (cdr names) (cons (cons (car names) ret) rets)))))))
+           ((eq? (car query) '*local*)
+            (authenticate (cadr query))
+            (apply (eval (cadr ((record 'get) `(control local ,(caaddr query)))))
+                   (cons record (cdaddr query))))
+           (else
+            (apply (eval (cadr ((record 'get) `(control remote ,(car query)))))
+                   (cons record (cdr query))))))
+   ((record 'set!) '(control scratch) #f)
+   result)
