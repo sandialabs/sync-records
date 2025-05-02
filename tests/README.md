@@ -13,3 +13,5 @@ You can now run the test by executing the following commands.
 `$ ./test-record.sh <path/to/journal-sdk>`
 
 `$ ./test-ledger.sh <path/to/journalsdk>`
+
+`$ ./test-ontology.sh <path/to/journalsdk>`
