@@ -90,24 +90,15 @@
     `(lambda (record s p o)
        (,ontology-operate record s p o #f)))
 
-  (define ontology-clip-set!
-    '(lambda (record clip expansion)
-       ((record 'set!) `(ontology clipes ,clip) expansion)))
-
-  (define ontology-clip-get
-    '(lambda (record clip)
-       (cadr ((record 'get) `(ontology clipes ,clip)))))
-
-  (define ontology-clip-all
-    '(lambda (record)
-       (let loop ((in (cadr ((record 'get) '(ontology clipes)))) (out '()))
-         (if (null? in) out
-             (let ((expansion (cadr ((record 'get) `(ontology clipes ,(car in))))))
-               (loop (cdr in) (cons `(,(car in) ,expansion) out)))))))
-
+  (define ontology-library
+    `(lambda (function)
+       (case function
+         ((select) ,ontology-select)
+         ((insert!) ,ontology-insert!)
+         ((remove!) ,ontology-remove!)
+         (else (error 'missing-function "Function not found")))))
+  
   ((record 'set!) '(control local ontology-select) ontology-select)
   ((record 'set!) '(control local ontology-insert!) ontology-insert!)
   ((record 'set!) '(control local ontology-remove!) ontology-remove!)
-  ((record 'set!) '(control local ontology-clip-set!) ontology-clip-set!)
-  ((record 'set!) '(control local ontology-clip-get) ontology-clip-get)
-  ((record 'set!) '(control local ontology-clip-all) ontology-clip-all))
+  ((record 'set!) '(record library ontology) ontology-library))
