@@ -12,7 +12,7 @@
          (ontology-insert! (ref (s1)) (ref (p1)) (ref (o3)))
          (ontology-insert! (ref (s1)) (ref (p1)) (var))
          (ontology-insert! (ref (s1)) (ref (p2)) (exp (+ 2 2)))
-         ;; (ontology-remove! (ref (s1)) (ref (p1)) (ref (o1)))
+         (ontology-remove! (ref (s1)) (ref (p1)) (ref (o1)))
          (*step*)
          (ontology-select (ref (s1)) (ref (p1)) (var))
          (ontology-select (ref (s1)) (ref (p2)) (var)))))
