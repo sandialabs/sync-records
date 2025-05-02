@@ -1,18 +1,39 @@
-;; todo
-;; - have the final directory be an atomic ontology-specific object for quicker retrieval
-;;   - maybe as a hashmap?
-
 (lambda (record secret)
 
   (define ontology-hash
     '(lambda (s p o)
-       (sync-hash (append (expression->byte-vector s)
-                          (expression->byte-vector p)
-                          (expression->byte-vector o)))))
+       (sync-hash (apply append (map expression->byte-vector `(,s ,p ,o))))))
 
   (define ontology-store
     '(lambda (s p o)
-       (string->symbol (append (if s "s" "-") (if p "p" "-") (if o "o" "-")))))
+       (string->symbol (append (if (equal? s '(var)) "-" "s")
+                               (if (equal? p '(var)) "-" "p")
+                               (if (equal? o '(var)) "-" "o")))))
+
+  (define triples-load
+    '(lambda (record path)
+       (let ((root ((record 'get) path))
+             (type (expression->byte-vector 'ontology-triples)))
+         (if (or (not (sync-pair? root))
+                 (not (byte-vector? (sync-car root)))
+                 (eq? (byte-vector->expression (sync-car root)) 'triples-set))
+             ((record 'set!) path (sync-cons type (sync-null))))
+         (let ((record-new (eval (cadr ((record 'get) '(record library record)))))
+               (root-get (lambda () (sync-cdr ((record 'get) path))))
+               (root-set! (lambda (value)
+                            ((record 'set!) path (sync-cons type (if value value (sync-null)))))))
+           (record-new root-get root-set!)))))
+
+  (define triples-all
+    '(lambda (triples)
+       (let loop ((in (cadr ((triples 'get) '()))) (out '()))
+         (if (null? in) out
+             (let ((triple ((triples 'get) `(,(car in)))))
+               (loop (cdr in) (cons triple out)))))))
+
+  (define triples-set!
+    `(lambda (triples s p o value)
+       ((triples 'set!) `(,(,ontology-hash s p o)) value)))
 
   (define ontology-check
     '(lambda (s p o)
@@ -36,20 +57,16 @@
     `(lambda*
       (record s p o graph index)
       (,ontology-check s p o)
-      (let ((ledger-get ((eval (cadr ((record 'get) '(control library ledger)))) 'get))
+      (let ((ledger-get ((eval (cadr ((record 'get) '(record library ledger)))) 'get))
             (store (,ontology-store s p o))
             (store-id (,ontology-hash s p o)))
         (let ((path `(*state* *ontology* ,store ,store-id)))
-          (let loop ((in (cadr (ledger-get record path))) (out '()))
-            (if (null? in) out
-                (let ((triple (cadr (ledger-get record (append path `(,(car in)))))))
-                  (loop (cdr in) (cons triple out)))))))))
+          (,triples-all (,triples-load record path))))))
 
   (define ontology-operate
     `(lambda (record s p o value)
        (,ontology-check s p o)
-       (let ((ledger-set! ((eval (cadr ((record 'get) '(control library ledger)))) 'set!))
-             (id (,ontology-hash s p o)))
+       (let ((ledger-set! ((eval (cadr ((record 'get) '(record library ledger)))) 'set!)))
          (let loop ((ls `((,s ,p ,o)
                           (,s ,p (var)) (,s (var) ,o) ((var) ,p ,o)
                           (,s (var) (var)) ((var) ,p (var)) ((var) (var) ,o)
@@ -57,8 +74,9 @@
            (if (null? ls) #t
                (let ((store (apply ,ontology-store (car ls)))
                      (store-id (apply ,ontology-hash (car ls))))
-                 (ledger-set! record `(*state* *ontology* ,store ,store-id ,id) value)
-                 (loop (cdr ls))))))))
+                 (let ((path `(*state* *ontology* ,store ,store-id)))
+                   (,triples-set! (,triples-load record path) s p o value)
+                   (loop (cdr ls)))))))))
 
   (define ontology-insert!
     `(lambda (record s p o)

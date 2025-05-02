@@ -227,7 +227,6 @@
 
      ((record 'set!) '(ledger chain index) 0) 
      ((record 'set!) '(control step 0) step!)
-     ((record 'set!) '(control library ledger) ledger-library)
      ((record 'set!) '(control local ledger-config) ledger-config-local)
      ((record 'set!) '(control local ledger-set!) ledger-set!)
      ((record 'set!) '(control local ledger-get) ledger-get)
@@ -237,5 +236,6 @@
      ((record 'set!) '(control remote ledger-config) ledger-config-remote)
      ((record 'set!) '(control remote ledger-prove) ledger-prove)
      ((record 'set!) '(control remote ledger-synchronize) ledger-synchronize)
+     ((record 'set!) '(record library ledger) ledger-library)
 
      "Installed ledger"))
