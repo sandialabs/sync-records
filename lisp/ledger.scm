@@ -1,3 +1,17 @@
+;; todos
+;; - support path shortcuts
+;;   - api
+;;     - ledger-shortcut-set!
+;;     - ledger-shortcut-get
+;;     - ledger-shortcut-all
+;;     - ledger-shortcut-expand
+;;   - examples
+;;     - (index n)
+;;     - (peers node-1 node-2)
+;;     - (bytes "deadbeefdeadbeef")
+;;     - (my-hardcoded-abbreviation)
+
+
 (lambda (cryptography blocking? window)
   `(lambda (record secret) 
 
@@ -119,12 +133,11 @@
        `(lambda*
          (record path index)
          (let ((chain-path (,ledger-path record index)))
-           (if (not (and (> (length path) 1) (not (null? path)) (eq? (car path) '*peers*)))
+           (if (not (and (> (length path) 1) (eq? (car path) '*peers*)))
                (let ((index (cadr ((record 'get) (append chain-path '(index))))))
-                 (cond ((null? path) '(directory (*state* *peers*) #t))
-                       ((eq? (car path) '*state*) ((record 'get) (append `(ledger states ,index) (cdr path))))
+                 (cond ((eq? (car path) '*state*) ((record 'get) (append `(ledger states ,index) (cdr path))))
                        ((eq? (car path) '*peers*) ((record 'get) (append chain-path '(*peers*))))
-                       (else (error 'path-error "Could not get path"))))
+                       (else (error path-error "Could not get path"))))
                (let ((result (,peer-prove record (cadr path) chain-path (list-tail path 2)))
                      (path-peer (append chain-path `(*peers* ,(cadr path)))))
                  ((record 'deserialize!) '(control scratch) result)
@@ -191,6 +204,15 @@
                 ((record 'slice!) '(control scratch) '(index))
                 ((record 'serialize) '(control scratch))))))
 
+     (define ledger-library
+       `(lambda (function)
+          (case function
+            ((get) ,ledger-get)
+            ((set!) ,ledger-set!)
+            ((index) ,ledger-index)
+            ((peers) ,ledger-peers)
+            (else (error 'missing-function "Function not found")))))
+
      (let* ((seed (byte-vector->hex-string
                    (sync-hash (expression->byte-vector secret))))
             (result (sync-http 'get (append ,cryptography "/signature/key/" seed)))
@@ -205,6 +227,7 @@
 
      ((record 'set!) '(ledger chain index) 0) 
      ((record 'set!) '(control step 0) step!)
+     ((record 'set!) '(control library ledger) ledger-library)
      ((record 'set!) '(control local ledger-config) ledger-config-local)
      ((record 'set!) '(control local ledger-set!) ledger-set!)
      ((record 'set!) '(control local ledger-get) ledger-get)
