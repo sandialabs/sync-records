@@ -132,23 +132,26 @@
      (define ledger-get
        `(lambda*
          (record path index)
-         (let ((chain-path (,ledger-path record index)))
-           (if (not (and (> (length path) 1) (eq? (car path) '*peers*)))
-               (let ((index (cadr ((record 'get) (append chain-path '(index))))))
-                 (cond ((eq? (car path) '*state*) ((record 'get) (append `(ledger states ,index) (cdr path))))
-                       ((eq? (car path) '*peers*) ((record 'get) (append chain-path '(*peers*))))
-                       (else (error path-error "Could not get path"))))
-               (let ((result (,peer-prove record (cadr path) chain-path (list-tail path 2)))
-                     (path-peer (append chain-path `(*peers* ,(cadr path)))))
-                 ((record 'deserialize!) '(control scratch) result)
-                 (if (not ((record 'equivalent?) path-peer '(control scratch)))
-                     (error 'integrity-error "Data does not verify"))
-                 ((record 'get) (append '(control scratch) (list-tail path 2))))))))
+         (if (and (not index) (not (null? path)) (eq? (car path) '*state*))
+             ((record 'get) (append '(ledger stage) path))
+             (let ((chain-path (,ledger-path record index)))
+               (if (not (and (> (length path) 1) (not (null? path)) (eq? (car path) '*peers*)))
+                   (let ((index (cadr ((record 'get) (append chain-path '(index))))))
+                     (cond ((null? path) '(directory (*state* *peers*) #t))
+                           ((eq? (car path) '*state*) ((record 'get) (append `(ledger states ,index) (cdr path))))
+                           ((eq? (car path) '*peers*) ((record 'get) (append chain-path '(*peers*))))
+                           (else (error 'path-error "Could not get path"))))
+                   (let ((result (,peer-prove record (cadr path) chain-path (list-tail path 2)))
+                         (path-peer (append chain-path `(*peers* ,(cadr path)))))
+                     ((record 'deserialize!) '(control scratch) result)
+                     (if (not ((record 'equivalent?) path-peer '(control scratch)))
+                         (error 'integrity-error "Data does not verify"))
+                     ((record 'get) (append '(control scratch) (list-tail path 2)))))))))
 
      (define ledger-set!
        `(lambda (record path value)
           (if (or (null? path) (not (eq? (car path) '*state*)))
-              (error 'path-error "first path must be *state*")
+              (error 'path-error "first path segment must be *state*")
               ((record 'set!) (append '(ledger stage) path) value))))
 
      (define ledger-peer!
@@ -205,13 +208,14 @@
                 ((record 'serialize) '(control scratch))))))
 
      (define ledger-library
-       `(lambda (function)
-          (case function
-            ((get) ,ledger-get)
-            ((set!) ,ledger-set!)
-            ((index) ,ledger-index)
-            ((peers) ,ledger-peers)
-            (else (error 'missing-function "Function not found")))))
+       `(lambda (record)
+          (lambda (function)
+            (case function
+              ((get) (lambda args (apply ,ledger-get (cons record args))))
+              ((set!) (lambda args (apply ,ledger-set! (cons record args))))
+              ((index) (lambda args (apply ,ledger-index (cons record args))))
+              ((peers) (lambda args (apply ,ledger-peers (cons record args))))
+              (else (error 'missing-function "Function not found"))))))
 
      (let* ((seed (byte-vector->hex-string
                    (sync-hash (expression->byte-vector secret))))

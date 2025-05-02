@@ -29,7 +29,7 @@
          (case (bytes 0)
            ((0) (subvector bytes 1))
            ((1) (byte-vector->expression (subvector bytes 1)))
-           (else (display bytes) (newline) (error 'invalid-type "Key type encoding not recognized"))))
+           (else (error 'invalid-type "Key type encoding not recognized"))))
 
        (define (obj->node value)
          (cond ((sync-pair? value) value)
@@ -428,7 +428,7 @@
                    ((sync-pair? obj)
                     `(directory ,(map bytes->key (dir-all obj))
                                 ,(not (dir-overlay? obj))))
-                   ((procedure? obj) (obj))
+                   ((procedure? obj) `(structure ,(obj)))
                    (else `(object ,obj))))))
 
        (define (record-equal? source path)

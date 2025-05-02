@@ -10,30 +10,34 @@
                                (if (equal? p '(var)) "-" "p")
                                (if (equal? o '(var)) "-" "o")))))
 
-  (define triples-load
-    '(lambda (record path)
-       (let ((root ((record 'get) path))
-             (type (expression->byte-vector 'ontology-triples)))
-         (if (or (not (sync-pair? root))
-                 (not (byte-vector? (sync-car root)))
-                 (eq? (byte-vector->expression (sync-car root)) 'triples-set))
-             ((record 'set!) path (sync-cons type (sync-null))))
-         (let ((record-new (eval (cadr ((record 'get) '(record library record)))))
-               (root-get (lambda () (sync-cdr ((record 'get) path))))
-               (root-set! (lambda (value)
-                            ((record 'set!) path (sync-cons type (if value value (sync-null)))))))
-           (record-new root-get root-set!)))))
+  (define ontology-triples-all
+    '(lambda (record path index)
+       (let ((ledger ((eval (cadr ((record 'get) '(record library ledger)))) record))
+             (record-init (eval (cadr ((record 'get) '(record library record))))))
+         (let ((root-get (lambda () (sync-cdr (cadr ((ledger 'get) path index)))))
+               (root-set! (lambda () (error 'set-error "Read-only record"))))
+           (let ((subrecord (record-init root-get root-set!)))
+             (let loop ((in (cadr ((subrecord 'get) '()))) (out '()))
+               (if (null? in) out
+                   (let ((triple ((subrecord 'get) `(,(car in)))))
+                     (loop (cdr in) (cons triple out))))))))))
 
-  (define triples-all
-    '(lambda (triples)
-       (let loop ((in (cadr ((triples 'get) '()))) (out '()))
-         (if (null? in) out
-             (let ((triple ((triples 'get) `(,(car in)))))
-               (loop (cdr in) (cons triple out)))))))
-
-  (define triples-set!
-    `(lambda (triples s p o value)
-       ((triples 'set!) `(,(,ontology-hash s p o)) value)))
+  (define ontology-triples-set!
+    `(lambda (record path s p o value)
+       (let ((ledger ((eval (cadr ((record 'get) '(record library ledger)))) record)))
+         (let ((root ((ledger 'get) path))
+               (type (expression->byte-vector 'ontology-triples)))
+           (if (or (not (eq? (car root) 'structure))
+                   (not (byte-vector? (sync-car (cadr root))))
+                   (not (eq? (byte-vector->expression (sync-car (cadr root))) 'ontology-triples)))
+               ((ledger 'set!) path (sync-cons type (sync-null))))
+           (let ((record-init (eval (cadr ((record 'get) '(record library record)))))
+                 (root-get (lambda () (sync-cdr (cadr ((ledger 'get) path)))))
+                 (root-set! (lambda (value)
+                              ((ledger 'set!) path (sync-cons type (if value value (sync-null)))))))
+             (let ((subrecord (record-init root-get root-set!)))
+               ((subrecord 'set!) `(,(,ontology-hash s p o)) value)
+               ))))))
 
   (define ontology-check
     '(lambda (s p o)
@@ -57,46 +61,50 @@
     `(lambda*
       (record s p o graph index)
       (,ontology-check s p o)
-      (let ((ledger-get ((eval (cadr ((record 'get) '(record library ledger)))) 'get))
+      (let ((graph (if graph graph '(*state* *ontology*)))
             (store (,ontology-store s p o))
             (store-id (,ontology-hash s p o)))
-        (let ((path `(*state* *ontology* ,store ,store-id)))
-          (,triples-all (,triples-load record path))))))
+        (let ((path (append graph `(,store ,store-id))))
+          (,ontology-triples-all record path index)))))
 
   (define ontology-operate
-    `(lambda (record s p o value)
+    `(lambda (record s p o graph value)
        (,ontology-check s p o)
-       (let ((ledger-set! ((eval (cadr ((record 'get) '(record library ledger)))) 'set!)))
-         (let loop ((ls `((,s ,p ,o)
-                          (,s ,p (var)) (,s (var) ,o) ((var) ,p ,o)
-                          (,s (var) (var)) ((var) ,p (var)) ((var) (var) ,o)
-                          ((var) (var) (var)))))
-           (if (null? ls) #t
-               (let ((store (apply ,ontology-store (car ls)))
-                     (store-id (apply ,ontology-hash (car ls))))
-                 (let ((path `(*state* *ontology* ,store ,store-id)))
-                   (,triples-set! (,triples-load record path) s p o value)
-                   (loop (cdr ls)))))))))
+       (let loop ((ls `((,s ,p ,o)
+                        (,s ,p (var)) (,s (var) ,o) ((var) ,p ,o)
+                        (,s (var) (var)) ((var) ,p (var)) ((var) (var) ,o)
+                        ((var) (var) (var)))))
+         (if (null? ls) #t
+             (let ((store (apply ,ontology-store (car ls)))
+                   (store-id (apply ,ontology-hash (car ls))))
+               (let ((path (append graph `(,store ,store-id))))
+                 (,ontology-triples-set! record path s p o value)
+                 (loop (cdr ls))))))))
 
   (define ontology-insert!
-    `(lambda (record s p o)
-       (let ((ontology-assign ,ontology-assign))
+    `(lambda*
+      (record s p o graph)
+       (let ((graph (if graph graph '(*state* *ontology*)))
+             (ontology-assign ,ontology-assign))
          (let ((s (ontology-assign s))
                (p (ontology-assign p))
                (o (ontology-assign o)))
-           (,ontology-operate record s p o `(,s ,p ,o))))))
+           (,ontology-operate record s p o graph `(,s ,p ,o))))))
 
   (define ontology-remove!
-    `(lambda (record s p o)
-       (,ontology-operate record s p o #f)))
+    `(lambda*
+      (record s p o graph)
+       (let ((graph (if graph graph '(*state* *ontology*))))
+         (,ontology-operate record s p o graph #f))))
 
   (define ontology-library
-    `(lambda (function)
-       (case function
-         ((select) ,ontology-select)
-         ((insert!) ,ontology-insert!)
-         ((remove!) ,ontology-remove!)
-         (else (error 'missing-function "Function not found")))))
+    `(lambda (record)
+       (lambda (function)
+         (case function
+           ((select) (lambda args (apply ,ontology-select (cons record args))))
+           ((insert!) (lambda args (apply ,ontology-insert! (cons record args))))
+           ((remove!) (lambda args (apply ,ontology-remove! (cons record args))))
+           (else (error 'missing-function "Function not found"))))))
   
   ((record 'set!) '(control local ontology-select) ontology-select)
   ((record 'set!) '(control local ontology-insert!) ontology-insert!)
