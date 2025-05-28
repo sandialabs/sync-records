@@ -6,7 +6,10 @@
     `(lambda (root-get root-set!)
        ;; --- verifiable map structure ---
 
-       (define (print x) (display x) (newline))
+       (define (print . exprs)
+         (let loop ((exprs exprs))
+           (if (null? exprs) (newline)
+               (begin (display (car exprs)) (display " ") (loop (cdr exprs))))))
 
        (define sync-null-expr (byte-vector->expression (expression->byte-vector (sync-null))))
        
@@ -105,13 +108,15 @@
              (case (car info)
                ((stub) #f)
                ((p-leaf)
-                (error 'record-error "Cannot check overlayed for pruned leaf"))
+                (equal? (cadr info) key))
                ((p-branch)
                 (error 'record-error "Cannot check overlayed for pruned branch"))
                ((u-leaf o-leaf)
                 (if (equal? (cadr info) key)
                     (equal? (cadddr info)
-                            (sync-pair->byte-vector (sync-cons key (obj->node value))))
+                            (sync-hash (append (sync-hash (sync-hash (cadr info)))
+                                               (if (sync-pair? value) (dir-digest value)
+                                                   (sync-hash (sync-hash value))))))
                     (error 'record-error "Cannot check overlayed for unset key")))
                ((u-branch o-branch)
                 (loop (if (zero? (car bits)) (cadr info) (caddr info)) (cdr bits)))
@@ -404,16 +409,14 @@
        (define (r-valid? node)
          (let loop-1 ((node node))
            (if (not (sync-pair? node)) #t
-               (if (not (dir-valid? node)) (error 'verification-error)
+               (if (not (dir-valid? node)) #f
                    (let loop-2 ((keys (dir-all node)))
                      (if (null? keys) #t
                          (let ((child (dir-get node (car keys))))
                            (if (and (dir-overlay? node)
-                                    (dir-overlay? child)
-                                    (dir-overlayed? node (car keys) child)) ;; this looks fishy
-                               (error 'verification-error "Digest do not match"))
-                           (loop-2 (cdr keys))
-                           (loop-1 child))))))))
+                                    (not (dir-overlayed? node (car keys) child))) #f
+                               (if (not (loop-2 (cdr keys))) #f
+                                   (loop-1 child))))))))))
 
        (define (r-complete? path)
          (let ((node (r-read (map key->bytes path))))
@@ -439,8 +442,8 @@
        (define (record-equivalent? source path)
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (let ((val-1 (r-read source)) (val-2 (r-read path)))
-             (equal? (if val-1 (dir-digest val-1) #f)
-                     (if val-2 (dir-digest val-2) #f)))))
+             (equal? (if (sync-pair? val-1) (dir-digest val-1) #f)
+                     (if (sync-pair? val-2) (dir-digest val-2) #f)))))
 
        (define (record-serialize path)
          (let ((path (map key->bytes path)))
