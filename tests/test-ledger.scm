@@ -32,31 +32,31 @@
      (sync-call `(,record-src
                   ,(cdr (assoc ledger-1 pass))
                   ,control-src
-                  ,(ledger-src "http://localhost:8887" #t 1024))
+                  ,(ledger-src "http://localhost:8887" #t 10))
                 #t
                 ledger-1)
      (sync-call `(,record-src
                   ,(cdr (assoc ledger-2 pass))
                   ,control-src
-                  ,(ledger-src "http://localhost:8887" #t 1024))
+                  ,(ledger-src "http://localhost:8887" #t 10))
                 #t
                 ledger-2)
      (sync-call `(,record-src
                   ,(cdr (assoc ledger-3 pass))
                   ,control-src
-                  ,(ledger-src "http://localhost:8887" #t 1024))
+                  ,(ledger-src "http://localhost:8887" #t 10))
                 #t
                 ledger-3)
      (sync-call `(,record-src
                   ,(cdr (assoc ledger-4 pass))
                   ,control-src
-                  ,(ledger-src "http://localhost:8887" #t 1024))
+                  ,(ledger-src "http://localhost:8887" #t 10))
                 #t
                 ledger-4)
      (sync-call `(,record-src
                   ,(cdr (assoc ledger-5 pass))
                   ,control-src
-                  ,(ledger-src "http://localhost:8887" #t 1024))
+                  ,(ledger-src "http://localhost:8887" #t 10))
                 #t
                 ledger-5)))
 
@@ -66,8 +66,14 @@
 
   (define input
     `((,ledger-1 . *step*)
+      (,ledger-1 . (ledger-set! (*state* do pin this) 'yes))
+      (,ledger-1 . (ledger-set! (*state* do pin that) 'yes))
+      (,ledger-1 . (ledger-set! (*state* do not pin) 'no))
       (,ledger-1 . *step*)
-      (,ledger-1 . *step*)
+      (,ledger-1 . (ledger-get) (*state* do pin) 2)
+      (,ledger-1 . (ledger-pin! (*state* do pin this) 2))
+      (,ledger-1 . (ledger-pin! (*state* do pin that) 2))
+      (,ledger-1 . (ledger-get) (*state* do pin) 2)
       (,ledger-1 . (ledger-peer! ledger-2 ,(make-messenger ledger-2)))
       (,ledger-1 . (ledger-peer! ledger-3 blah))
       (,ledger-1 . (ledger-peer! ledger-3 #f))
@@ -78,6 +84,7 @@
       (,ledger-2 . (ledger-get (*state* a b c*)))
       (,ledger-1 . *step*)
       (,ledger-2 . *step*)
+      (,ledger-2 . (ledger-pin! (*state* a b c) 3))
       (,ledger-1 . *step*)
       (,ledger-2 . *step*)
       (,ledger-1 . *step*)
@@ -121,6 +128,24 @@
       (,ledger-1 . (ledger-get (*peers* ledger-2 *peers* ledger-3 *state* d e f)))
       (,ledger-1 . (ledger-get (*peers* ledger-2 *peers* ledger-3 *peers* ledger-4 *state* g h i)))
       (,ledger-1 . (ledger-get (*peers* ledger-2 *peers* ledger-3 *peers* ledger-5 *state* g h i)))
+      (,ledger-1 . *step*)
+      (,ledger-2 . *step*)
+      (,ledger-1 . *step*)
+      (,ledger-2 . *step*)
+      (,ledger-1 . (ledger-index))
+      (,ledger-1 . (ledger-get) (*state* do pin) 2)
+      (,ledger-1 . (ledger-get) (*state* do pin this) 2)
+      (,ledger-1 . (ledger-get) (*state* do pin that) 2)
+      (,ledger-1 . (ledger-get) (*state* do not pin) 2)
+      (,ledger-1 . (ledger-unpin!) (*state* do pin that) 2)
+      (,ledger-1 . (ledger-get) (*state* do pin) 2)
+      (,ledger-1 . (ledger-get) (*state* do pin this) 2)
+      (,ledger-1 . (ledger-get) (*state* do pin that) 2)
+      (,ledger-1 . *step*)
+      (,ledger-2 . *step*)
+      (,ledger-1 . *step*)
+      (,ledger-2 . *step*)
+      (,ledger-1 . (ledger-get) (*peers* ledger-2 *state* a b c) 4)
       ))
 
   (let loop ((i 0) (input input) (output output))

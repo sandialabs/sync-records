@@ -38,7 +38,8 @@
                (else (append #u(1) (expression->byte-vector value)))))
 
        (define (node->obj node)
-         (cond ((byte-vector? node)
+         (cond ((boolean? node) node)
+               ((byte-vector? node)
                 (case (node 0)
                   ((0) (subvector node 1))
                   ((1) (byte-vector->expression (subvector node 1)))
@@ -277,7 +278,7 @@
                       (else logic-error "Missing conditions"))))))
 
        (define (dir-merge node-1 node-2)
-         (let loop ((node-1 node-1) (node-2 node-2))
+         (let recurse ((node-1 node-1) (node-2 node-2))
            (let ((info-1 (node->info node-1)) (info-2 (node->info node-2)))
              (case (car info-1)
                ((stub u-leaf u-branch) node-1)
@@ -300,10 +301,11 @@
                 (case (car info-2)
                   ((p-branch) node-1)
                   ((u-branch o-branch)
-                   (info->node (car info-2)
-                               (loop (cadr info-1) (cadr info-2))
-                               (loop (caddr info-1) (caddr info-2))
-                               (cadddr info-1)))
+                   (let* ((left (recurse (cadr info-1) (cadr info-2)))
+                          (right (recurse (caddr info-1) (caddr info-2)))
+                          (type (if (equal? (sync-pair->byte-vector (sync-cons left right)) (cadddr info-1))
+                                    'u-branch 'o-branch)))
+                     (info->node type left right (cadddr info-1))))
                   (else (error invalid-operation "Cannot merge incompatible directory"))))
                (else (error 'logic-error "Missing conditions"))))))
 
@@ -378,9 +380,10 @@
 
        (define (r-read path)
          (let loop ((node (root-get)) (path path))
-           (if (boolean? node) node
-               (if (null? path) node
-                   (loop (dir-get node (car path)) (cdr path))))))
+           (cond ((boolean? node) node)
+                 ((null? path) node)
+                 ((not (sync-pair? node)) #f)
+                 (else (loop (dir-get node (car path)) (cdr path))))))
 
        (define* (r-write! path value force-under?)
          (if (not value) #f
@@ -492,7 +495,9 @@
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (if (or (not (r-complete? source)) (not (r-complete? path))) #f
                (let ((value (r-read source)))
-                 (begin (r-write! path value #t) #t)))))
+                 (begin
+                   (r-write! path (node->obj value) #t)
+                   #t)))))
 
        (define (record-deserialize! path raw)
          (let ((path (map key->bytes path)))
@@ -513,7 +518,7 @@
          (let ((path (map key->bytes path)) (subpath (map key->bytes subpath)))
            (r-write! path
                      (let loop ((node (r-read path)) (subpath subpath))
-                       (if (or (not node) (null? subpath)) node
+                       (if (or (not node) (not (sync-pair? node)) (null? subpath)) node
                            (let ((key (car subpath)))
                              (dir-slice (dir-overlay node key
                                                      (loop (dir-get node key)
@@ -543,8 +548,8 @@
                       (not (equal? (dir-digest node-1) (dir-digest node-2)))) #f
                  (let ((result
                         (let loop-1 ((n-1 node-1) (n-2 node-2))
-                          (cond ((not n-1) n-2)
-                                ((not n-2) n-1)
+                          (cond ((boolean? n-1) n-2)
+                                ((boolean? n-2) n-1)
                                 ((not (sync-pair? n-1)) n-2)
                                 ((not (sync-pair? n-2)) n-1)
                                 (else (let ((n-3 (dir-merge n-1 n-2)))
