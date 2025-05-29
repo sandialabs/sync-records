@@ -6,7 +6,10 @@
     `(lambda (root-get root-set!)
        ;; --- verifiable map structure ---
 
-       (define (print x) (display x) (newline))
+       (define (print . exprs)
+         (let loop ((exprs exprs))
+           (if (null? exprs) (newline)
+               (begin (display (car exprs)) (display " ") (loop (cdr exprs))))))
 
        (define sync-null-expr (byte-vector->expression (expression->byte-vector (sync-null))))
        
@@ -38,7 +41,8 @@
                (else (append #u(1) (expression->byte-vector value)))))
 
        (define (node->obj node)
-         (cond ((byte-vector? node)
+         (cond ((boolean? node) node)
+               ((byte-vector? node)
                 (case (node 0)
                   ((0) (subvector node 1))
                   ((1) (byte-vector->expression (subvector node 1)))
@@ -82,6 +86,11 @@
            ((p-branch) (sync-cons (sync-null) (append #u(3) digest)))
            (else (error 'invalid-type "Invalid input type"))))
 
+       (define (leaf-hash key value)
+         (sync-hash (append (sync-hash (sync-hash key))
+                            (if (sync-pair? value) (cadddr (node->info value))
+                                (sync-hash (sync-hash value))))))
+
        (define (dir-new)
          (sync-null))
 
@@ -104,13 +113,11 @@
              (case (car info)
                ((stub) #f)
                ((p-leaf)
-                (error 'record-error "Cannot check overlayed for pruned leaf"))
+                (equal? (cadr info) key))
                ((p-branch)
                 (error 'record-error "Cannot check overlayed for pruned branch"))
                ((u-leaf o-leaf)
-                (if (equal? (cadr info) key)
-                    (equal? (cadddr info)
-                            (sync-pair->byte-vector (sync-cons key (obj->node value))))
+                (if (equal? (cadr info) key) (equal? (cadddr info) (leaf-hash key value))
                     (error 'record-error "Cannot check overlayed for unset key")))
                ((u-branch o-branch)
                 (loop (if (zero? (car bits)) (cadr info) (caddr info)) (cdr bits)))
@@ -187,10 +194,13 @@
              (case (car info)
                ((stub) (error 'invalid-operation "Cannot update unset key"))
                ((p-branch) (error 'invalid-operation "Cannot update pruned branch"))
-               ((u-leaf p-leaf) (if (equal? key (cadr info))
-                                    (if (equal? value (caddr info)) node
-                                        (info->node 'o-leaf key value (cadddr info)))
-                                    (error 'invalid-operation "Cannot update unset key")))
+               ((u-leaf p-leaf)
+                (cond ((not (equal? key (cadr info)))
+                       (error 'invalid-operation "Cannot update unset key"))
+                      ((equal? value (caddr info)) node)
+                      ((equal? (cadddr info) (leaf-hash key value))
+                       (info->node 'o-leaf key value (cadddr info)))
+                      (else (error 'integrity-error "Cannot overlay non-authentic node"))))
                ((o-leaf) (if (equal? key (cadr info))
                              (info->node 'o-leaf key value (cadddr info))
                              (error 'invalid-operation "Cannot update unset key")))
@@ -257,7 +267,6 @@
                       ((u-leaf o-leaf)
                        (if (not (equal? key (cadr info))) info
                            `(p-leaf ,(cadr info) ,keep-key? ,(cadddr info))))
-                      ((u-leaf o-leaf) info)
                       ((u-branch o-branch)
                        (let ((left (if (zero? (car bits))
                                        (loop (cadr info) (cdr bits))
@@ -277,7 +286,7 @@
                       (else logic-error "Missing conditions"))))))
 
        (define (dir-merge node-1 node-2)
-         (let loop ((node-1 node-1) (node-2 node-2))
+         (let recurse ((node-1 node-1) (node-2 node-2))
            (let ((info-1 (node->info node-1)) (info-2 (node->info node-2)))
              (case (car info-1)
                ((stub u-leaf u-branch) node-1)
@@ -300,10 +309,11 @@
                 (case (car info-2)
                   ((p-branch) node-1)
                   ((u-branch o-branch)
-                   (info->node (car info-2)
-                               (loop (cadr info-1) (cadr info-2))
-                               (loop (caddr info-1) (caddr info-2))
-                               (cadddr info-1)))
+                   (let* ((left (recurse (cadr info-1) (cadr info-2)))
+                          (right (recurse (caddr info-1) (caddr info-2)))
+                          (type (if (equal? (sync-pair->byte-vector (sync-cons left right)) (cadddr info-1))
+                                    'u-branch 'o-branch)))
+                     (info->node type left right (cadddr info-1))))
                   (else (error invalid-operation "Cannot merge incompatible directory"))))
                (else (error 'logic-error "Missing conditions"))))))
 
@@ -327,7 +337,7 @@
                        `(o-leaf ,(cadr info)
                                 ,(caddr info)
                                 ,(if (not (dir-overlay? (caddr info))) (cadddr info)
-                                     (dir-digest (caddr info)))))
+                                     (leaf-hash (cadr info) (caddr info)))))
                       ((u-branch) 
                        (let ((left (recurse (cadr info))) (right (recurse (caddr info))))
                          `(o-branch ,(apply info->node left)
@@ -378,9 +388,10 @@
 
        (define (r-read path)
          (let loop ((node (root-get)) (path path))
-           (if (boolean? node) node
-               (if (null? path) node
-                   (loop (dir-get node (car path)) (cdr path))))))
+           (cond ((boolean? node) node)
+                 ((null? path) node)
+                 ((not (sync-pair? node)) #f)
+                 (else (loop (dir-get node (car path)) (cdr path))))))
 
        (define* (r-write! path value force-under?)
          (if (not value) #f
@@ -389,10 +400,11 @@
                 (if (null? path) (obj->node value)
                     (let* ((key (car path))
                            (node (if node node (dir-new)))
+                           ;; (node (if force-under? (dir-underlay node) node))
                            (old (dir-get node key)))
-                      (if (or over? (and (sync-pair? node) (dir-overlay? node)))
-                          (let ((node (if force-under? (dir-underlay node) node)))
-                            (dir-overlay node key (loop old (cdr path) #t)))
+                      (if (and (or over? (and (sync-pair? node) (dir-overlay? node)))
+                               (not force-under?))
+                          (dir-overlay node key (loop old (cdr path) #t))
                           (if (sync-pair? node)
                               (dir-set node key (loop old (cdr path) #f))
                               (dir-set (dir-new) key
@@ -401,16 +413,14 @@
        (define (r-valid? node)
          (let loop-1 ((node node))
            (if (not (sync-pair? node)) #t
-               (if (not (dir-valid? node)) (error 'verification-error)
+               (if (not (dir-valid? node)) #f
                    (let loop-2 ((keys (dir-all node)))
                      (if (null? keys) #t
                          (let ((child (dir-get node (car keys))))
                            (if (and (dir-overlay? node)
-                                    (dir-overlay? child)
-                                    (dir-overlayed? node (car keys) child)) ;; this looks fishy
-                               (error 'verification-error "Digest do not match"))
-                           (loop-2 (cdr keys))
-                           (loop-1 child))))))))
+                                    (not (dir-overlayed? node (car keys) child))) #f
+                               (if (not (loop-2 (cdr keys))) #f
+                                   (loop-1 child))))))))))
 
        (define (r-complete? path)
          (let ((node (r-read (map key->bytes path))))
@@ -436,8 +446,8 @@
        (define (record-equivalent? source path)
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (let ((val-1 (r-read source)) (val-2 (r-read path)))
-             (equal? (if val-1 (dir-digest val-1) #f)
-                     (if val-2 (dir-digest val-2) #f)))))
+             (equal? (if (sync-pair? val-1) (dir-digest val-1) #f)
+                     (if (sync-pair? val-2) (dir-digest val-2) #f)))))
 
        (define (record-serialize path)
          (let ((path (map key->bytes path)))
@@ -492,7 +502,9 @@
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (if (or (not (r-complete? source)) (not (r-complete? path))) #f
                (let ((value (r-read source)))
-                 (begin (r-write! path value #t) #t)))))
+                 (begin
+                   (r-write! path (node->obj value) #t)
+                   #t)))))
 
        (define (record-deserialize! path raw)
          (let ((path (map key->bytes path)))
@@ -513,7 +525,7 @@
          (let ((path (map key->bytes path)) (subpath (map key->bytes subpath)))
            (r-write! path
                      (let loop ((node (r-read path)) (subpath subpath))
-                       (if (or (not node) (null? subpath)) node
+                       (if (or (not node) (not (sync-pair? node)) (null? subpath)) node
                            (let ((key (car subpath)))
                              (dir-slice (dir-overlay node key
                                                      (loop (dir-get node key)
@@ -543,8 +555,8 @@
                       (not (equal? (dir-digest node-1) (dir-digest node-2)))) #f
                  (let ((result
                         (let loop-1 ((n-1 node-1) (n-2 node-2))
-                          (cond ((not n-1) n-2)
-                                ((not n-2) n-1)
+                          (cond ((boolean? n-1) n-2)
+                                ((boolean? n-2) n-1)
                                 ((not (sync-pair? n-1)) n-2)
                                 ((not (sync-pair? n-2)) n-1)
                                 (else (let ((n-3 (dir-merge n-1 n-2)))
@@ -567,8 +579,20 @@
                              (if (null? keys) (dir-align node)
                                  (loop (dir-set node (car keys)
                                                 (recurse (dir-get node (car keys))))
-                                       (cdr keys)))))))
+                                       (cdr keys)))))) #t)
            #t))
+
+       (define (record-valid? path)
+         (let ((path (map key->bytes path)))
+           (let ((node (r-read path)))
+             (r-valid? node))))
+
+       (define (record-digest path)
+         (let ((path (map key->bytes path)))
+           (let ((node (r-read path)))
+             (if (sync-pair? node)
+                 (dir-digest node)
+                 node))))
 
        (define-macro (trace name)
          (let ((name-new (gensym)))
@@ -601,6 +625,8 @@
            ((slice!) record-slice!)
            ((prune!) record-prune!)
            ((align!) record-align!)
+           ((valid?) record-valid?)
+           ((digest) record-digest)
            ((serialize) record-serialize)
            ((deserialize!) record-deserialize!)
            (else (error 'unknown-function "Function not found"))))))
