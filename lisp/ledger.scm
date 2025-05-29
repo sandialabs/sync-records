@@ -1,17 +1,3 @@
-;; todos
-;; - support path shortcuts
-;;   - api
-;;     - ledger-shortcut-set!
-;;     - ledger-shortcut-get
-;;     - ledger-shortcut-all
-;;     - ledger-shortcut-expand
-;;   - examples
-;;     - (index n)
-;;     - (peers node-1 node-2)
-;;     - (bytes "deadbeefdeadbeef")
-;;     - (my-hardcoded-abbreviation)
-
-
 (lambda (cryptography blocking? window)
   `(lambda (record secret) 
 
@@ -67,8 +53,8 @@
             ((record 'copy!) '(ledger stage *state*) `(ledger states ,(+ index 1)))
             ((record 'copy!) '(ledger previous) '(control scratch previous))
             ((record 'set!) '(control scratch index) (+ index 1))
-            ((record 'prune!) '(control scratch) '(*state*) #t)
             ((record 'align!) '(control scratch))
+            ((record 'prune!) '(control scratch) '(*state*) #t)
             ((record 'copy!) '(control scratch) '(ledger chain))
             (+ index 1))))
 
@@ -129,24 +115,67 @@
                  (i-remote (cadr ((record 'get) (append chain-path `(*peers* ,name index))))))
             (messenger (,signature-sign `(ledger-prove ,remote-path ,i-remote))))))
 
+     (define ledger-fetch
+       `(lambda (record path index store)
+          (let* ((chain-path (,ledger-path record index))
+                 (index (cadr ((record 'get) (append chain-path '(index))))))
+            (if (not (and (eq? (car path) '*peers*) (> (length path) 1)))
+                (error 'path-error "Invalid query path")
+                (let ((result (,peer-prove record (cadr path) chain-path (list-tail path 2)))
+                      (path-peer (append chain-path `(*peers* ,(cadr path)))))
+                  ((record 'deserialize!) '(control scratch fetch) result)
+                  (if (not ((record 'equivalent?) path-peer '(control scratch fetch)))
+                      (error 'integrity-error "Data does not verify"))
+                  ((record 'copy!) '(control scratch fetch) store))))))
+
+     (define ledger-pin!
+       `(lambda (record path index)
+          (let* ((chain-path (,ledger-path record index))
+                 (index (cadr ((record 'get) (append chain-path '(index))))))
+            ((record 'copy!) chain-path '(control scratch local))
+            (cond ((and (> (length path) 1) (eq? (car path) '*state*))
+                   ((record 'merge!) `(ledger states ,index) '(control scratch local *state*))
+                   ((record 'slice!) '(control scratch local) path)
+                   (if (eq? (car ((record 'get) `(ledger pinned ,index))) 'nothing)
+                       ((record 'copy!) '(control scratch local) `(ledger pinned ,index))
+                       ((record 'merge!) '(control scratch local) `(ledger pinned ,index))))
+                  ((and (> (length path) 1) (eq? (car path) '*peer*))
+                   (let ((store '(control scratch pin)))
+                     (,ledger-fetch record path index store)
+                     ((record 'merge!) '(control scratch pin) store)))
+                  (else
+                   (error 'path-error "Path must start with *state* or *peer* have length > 1"))))))
+
+     (define ledger-unpin!
+       `(lambda (record path index)
+          (let* ((chain-path (,ledger-path record index))
+                 (index (cadr ((record 'get) (append chain-path '(index))))))
+            (cond ((and (> (length path) 1) (eq? (car path) '*state*))
+                   ((record 'prune!) `(ledger pinned ,index) path))
+                  ((and (> (length path) 1) (eq? (car path) '*peer*))
+                   ((record 'prune!) `(ledger pinned ,index) path))
+                  (else (error 'path-error "Path must start with *state* or *peer* and have length > 1"))))))
+
      (define ledger-get
        `(lambda*
          (record path index)
          (if (and (not index) (not (null? path)) (eq? (car path) '*state*))
              ((record 'get) (append '(ledger stage) path))
-             (let ((chain-path (,ledger-path record index)))
-               (if (not (and (> (length path) 1) (not (null? path)) (eq? (car path) '*peers*)))
-                   (let ((index (cadr ((record 'get) (append chain-path '(index))))))
-                     (cond ((null? path) '(directory (*state* *peers*) #t))
-                           ((eq? (car path) '*state*) ((record 'get) (append `(ledger states ,index) (cdr path))))
-                           ((eq? (car path) '*peers*) ((record 'get) (append chain-path '(*peers*))))
-                           (else (error 'path-error "Could not get path"))))
-                   (let ((result (,peer-prove record (cadr path) chain-path (list-tail path 2)))
-                         (path-peer (append chain-path `(*peers* ,(cadr path)))))
-                     ((record 'deserialize!) '(control scratch) result)
-                     (if (not ((record 'equivalent?) path-peer '(control scratch)))
-                         (error 'integrity-error "Data does not verify"))
-                     ((record 'get) (append '(control scratch) (list-tail path 2)))))))))
+             (let* ((chain-path (,ledger-path record index))
+                    (index (cadr ((record 'get) (append chain-path '(index)))))
+                    (pinned ((record 'get) (append `(ledger pinned ,index) path))))
+               (if (or (eq? (car pinned) 'object) (and (eq? (car pinned) 'directory) (caddr pinned))) pinned
+                   (cond ((null? path) '(directory (*state* *peers*) #t))
+                         ((eq? (car pinned) 'object) pinned)
+                         ((and (eq? (car path) '*peers*) (null? (cdr path)))
+                          ((record 'get) (append chain-path '(*peers*))))
+                         ((and (eq? (car path) '*state*))
+                          ((record 'get) (append `(ledger states ,index) (cdr path))))
+                         ((and (eq? (car path) '*peers*))
+                          (let ((store '(control scratch get)))
+                            (,ledger-fetch record path index store)
+                            ((record 'get) (append store (list-tail path 2)))))
+                         (else (error 'path-error "Path must start with *state* or *peer*"))))))))
 
      (define ledger-set!
        `(lambda (record path value)
@@ -175,26 +204,31 @@
           (if (not (,signature-verify `(ledger-prove ,path ,index) assertion))
               (error 'peer-error "Could not verify assertion")
               (let* ((chain-path (,ledger-path record index))
-                     (index (cadr ((record 'get) (append chain-path '(index))))))
+                     (index (cadr ((record 'get) (append chain-path '(index)))))
+                     (pinned ((record 'get) (append `(ledger pinned ,index) path))))
                 ((record 'copy!) chain-path '(control scratch local))
-                ((record 'merge!) `(ledger states ,index) '(control scratch local *state*))
-                (if (and (> (length path) 1) (eq? (car path) '*peers*))
-                    (let* ((path-remote (list-tail path 2))
-                           (result (,peer-prove record (cadr path) chain-path path-remote))
-                           (path-root `(control scratch local *peers* ,(cadr path))))
-                      ((record 'deserialize!) '(control scratch remote) result)
-                      (if (not ((record 'equivalent?) '(control scratch remote) path-root))
-                          (error 'peer-error "Ledger integrity error")
-                          ((record 'merge!) '(control scratch remote) path-root))))
                 ((record 'align!) '(control scratch local))
-                ((record 'slice!) '(control scratch local) path)
-                (let* ((path-abs (append '(control scratch local) path))
-                       (value ((record 'get) path-abs)))
-                  (if (eq? (car value) 'directory)
-                      (let loop ((names (cadr value)))
-                        (if (null? names) #t
-                            (begin ((record 'prune!) path-abs `(,(car names)) #t)
-                                   (loop (cdr names)))))))
+                (if (or (eq? (car pinned) 'object) (and (eq? (car pinned) 'directory) (caddr pinned)))
+                    ((record 'merge!) `(ledger pinned ,index) '(control scratch local))
+                    (begin
+                      ((record 'merge!) `(ledger states ,index) '(control scratch local *state*))
+                           (if (and (> (length path) 1) (eq? (car path) '*peers*))
+                               (let* ((path-remote (list-tail path 2))
+                                      (result (,peer-prove record (cadr path) chain-path path-remote))
+                                      (path-root `(control scratch local *peers* ,(cadr path))))
+                                 ((record 'deserialize!) '(control scratch remote) result)
+                                 (if (not ((record 'equivalent?) '(control scratch remote) path-root))
+                                     (error 'peer-error "Ledger integrity error")
+                                     ((record 'merge!) '(control scratch remote) path-root))))
+                           ((record 'slice!) '(control scratch local) path)
+                           (let* ((path-abs (append '(control scratch local) path))
+                                  (value ((record 'get) path-abs)))
+                             (if (eq? (car value) 'directory)
+                                 (let loop ((names (cadr value)))
+                                   (if (null? names) #t
+                                       (begin
+                                         ((record 'prune!) path-abs `(,(car names)) #t)
+                                         (loop (cdr names)))))))))
                 ((record 'serialize) '(control scratch local))))))
 
      (define ledger-synchronize
@@ -202,7 +236,7 @@
           (if (not (,signature-verify `(ledger-synchronize) assertion))
               (error 'peer-error "Could not verify assertion")
               (let ((chain-path (,ledger-path record -1)))
-                ((record 'copy!) '(ledger chain) '(control scratch))
+                ((record 'copy!) chain-path '(control scratch))
                 ((record 'align!) '(control scratch))
                 ((record 'slice!) '(control scratch) '(index))
                 ((record 'serialize) '(control scratch))))))
@@ -234,6 +268,8 @@
      ((record 'set!) '(control local ledger-config) ledger-config-local)
      ((record 'set!) '(control local ledger-set!) ledger-set!)
      ((record 'set!) '(control local ledger-get) ledger-get)
+     ((record 'set!) '(control local ledger-pin!) ledger-pin!)
+     ((record 'set!) '(control local ledger-unpin!) ledger-unpin!)
      ((record 'set!) '(control local ledger-index) ledger-index)
      ((record 'set!) '(control local ledger-peer!) ledger-peer!)
      ((record 'set!) '(control local ledger-peers) ledger-peers)
