@@ -14,13 +14,17 @@
     '(lambda (record path index)
        (let ((ledger ((eval (cadr ((record 'get) '(record library ledger)))) record))
              (record-init (eval (cadr ((record 'get) '(record library record))))))
-         (let ((root-get (lambda () (sync-cdr (cadr ((ledger 'get) path index)))))
+         (let ((root-get (lambda ()
+                           (let ((result ((ledger 'get) path index)))
+                             (if (eq? (car result) 'nothing) #f
+                                 (sync-cdr (cadr result))))))
                (root-set! (lambda () (error 'set-error "Read-only record"))))
            (let ((subrecord (record-init root-get root-set!)))
              (let loop ((in (cadr ((subrecord 'get) '()))) (out '()))
-               (if (null? in) out
+               (if (null? in)
+                   (if (null? out) '(nothing ()) `(object ,out))
                    (let ((triple ((subrecord 'get) `(,(car in)))))
-                     (loop (cdr in) (cons triple out))))))))))
+                     (loop (cdr in) (cons (cadr triple) out))))))))))
 
   (define ontology-triples-set!
     `(lambda (record path s p o value)
@@ -32,7 +36,10 @@
                    (not (eq? (byte-vector->expression (sync-car (cadr root))) 'ontology-triples)))
                ((ledger 'set!) path (sync-cons type (sync-null))))
            (let ((record-init (eval (cadr ((record 'get) '(record library record)))))
-                 (root-get (lambda () (sync-cdr (cadr ((ledger 'get) path)))))
+                 (root-get (lambda ()
+                             (let ((result ((ledger 'get) path)))
+                               (if (eq? (car result) 'nothing) #f
+                                   (sync-cdr (cadr result))))))
                  (root-set! (lambda (value)
                               ((ledger 'set!) path (sync-cons type (if value value (sync-null)))))))
              (let ((subrecord (record-init root-get root-set!)))

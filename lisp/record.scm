@@ -12,6 +12,8 @@
                (begin (display (car exprs)) (display " ") (loop (cdr exprs))))))
 
        (define sync-null-expr (byte-vector->expression (expression->byte-vector (sync-null))))
+
+       (define sync-struct (sync-cons (sync-null) (sync-null)))
        
        (define (key-bits key)
          (let loop-1 ((bytes (map (lambda (x) x) (sync-hash key))) (ret '()))
@@ -36,7 +38,7 @@
 
        (define (obj->node value)
          (cond ((sync-pair? value) value)
-               ((procedure? value) (sync-cons (sync-null) (value)))
+               ((procedure? value) (sync-cons sync-struct (value)))
                ((byte-vector? value) (append #u(0) value)) 
                (else (append #u(1) (expression->byte-vector value)))))
 
@@ -50,7 +52,7 @@
                ((sync-pair? node)
                 (if (sync-null? node) node
                     (let ((left (sync-car node)))
-                      (if (not (and (sync-pair? left) (sync-null? left))) node
+                      (if (not (equal? left sync-struct)) node
                           (lambda () (sync-cdr node))))))
                (else (error 'invalid-type "Invalid value type"))))
 
