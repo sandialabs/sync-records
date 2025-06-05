@@ -51,9 +51,8 @@
                   (else (error 'invalid-type "Type encoding unrecognized"))))
                ((sync-pair? node)
                 (if (sync-null? node) node
-                    (let ((left (sync-car node)))
-                      (if (not (equal? left sync-struct)) node
-                          (lambda () (sync-cdr node))))))
+                    (if (not (equal? (sync-car node) sync-struct)) node
+                        (lambda () (sync-cdr node)))))
                (else (error 'invalid-type "Invalid value type"))))
 
        (define (node->info node)
@@ -414,15 +413,16 @@
 
        (define (r-valid? node)
          (let loop-1 ((node node))
-           (if (not (sync-pair? node)) #t
-               (if (not (dir-valid? node)) #f
-                   (let loop-2 ((keys (dir-all node)))
-                     (if (null? keys) #t
-                         (let ((child (dir-get node (car keys))))
-                           (if (and (dir-overlay? node)
-                                    (not (dir-overlayed? node (car keys) child))) #f
-                               (if (not (loop-2 (cdr keys))) #f
-                                   (loop-1 child))))))))))
+           (cond ((not (sync-pair? node)) #t)
+                 ((equal? (sync-car node) sync-struct) #t)
+                 ((not (dir-valid? node)) #f)
+                 (else (let loop-2 ((keys (dir-all node)))
+                         (if (null? keys) #t
+                             (let ((child (dir-get node (car keys))))
+                               (if (and (dir-overlay? node)
+                                        (not (dir-overlayed? node (car keys) child))) #f
+                                        (if (not (loop-2 (cdr keys))) #f
+                                            (loop-1 child))))))))))
 
        (define (r-complete? path)
          (let ((node (r-read (map key->bytes path))))
