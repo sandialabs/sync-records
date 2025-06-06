@@ -157,30 +157,44 @@
                    ((record 'prune!) `(ledger pinned ,index) path))
                   (else (error 'path-error "Path must start with *state* or *peer* and have length > 1"))))))
 
+     (define ledger-operate
+       `(lambda (operate path index)
+          (if (and (not index) (not (null? path)) (eq? (car path) '*state*))
+              (operate (append '(ledger stage) path))
+              (let* ((chain-path (,ledger-path record index))
+                     (index (cadr (operate (append chain-path '(index)))))
+                     (pinned (operate (append `(ledger pinned ,index) path))))
+                (if (or (eq? (car pinned) 'object) (and (eq? (car pinned) 'directory) (caddr pinned))) pinned
+                    (cond ((null? path) '(directory (*state* *peers*) #t))
+                          ((eq? (car pinned) 'object) pinned)
+                          ((and (eq? (car path) '*peers*) (null? (cdr path)))
+                           (operate (append chain-path '(*peers*))))
+                          ((and (eq? (car path) '*state*))
+                           (operate (append `(ledger states ,index) (cdr path))))
+                          ((and (eq? (car path) '*peers*))
+                           (let ((store '(control scratch get)))
+                             (,ledger-fetch record path index store)
+                             (operate (append store (list-tail path 2)))))
+                          (else (error 'path-error "Path must start with *state* or *peer*"))))))))
+
      (define ledger-get
        `(lambda*
          (record path index)
-         (let* ((chain-path (,ledger-path record index))
-                (index (cadr ((record 'get) (append chain-path '(index)))))
-                (pinned ((record 'get) (append `(ledger pinned ,index) path))))
-           (if (or (eq? (car pinned) 'object) (and (eq? (car pinned) 'directory) (caddr pinned))) pinned
-               (cond ((null? path) '(directory (*state* *peers*) #t))
-                     ((eq? (car pinned) 'object) pinned)
-                     ((and (eq? (car path) '*peers*) (null? (cdr path)))
-                      ((record 'get) (append chain-path '(*peers*))))
-                     ((and (eq? (car path) '*state*))
-                      ((record 'get) (append `(ledger states ,index) (cdr path))))
-                     ((and (eq? (car path) '*peers*))
-                      (let ((store '(control scratch get)))
-                        (,ledger-fetch record path index store)
-                        ((record 'get) (append store (list-tail path 2)))))
-                     (else (error 'path-error "Path must start with *state* or *peer*")))))))
+         (,ledger-operate (lambda (x) ((record 'get) x)) path index)))
 
      (define ledger-set!
        `(lambda (record path value)
           (if (or (null? path) (not (eq? (car path) '*state*)))
-              (error 'path-error "first path must be *state*")
+              (error 'path-error "first path segment must be *state*")
               ((record 'set!) (append '(ledger stage) path) value))))
+
+     (define ledger-copy!
+       `(lambda*
+         (record path target index)
+         (if (or (null? target) (not (eq? (car target) '*state*)))
+             (error 'path-error "First segment of target path must be *state*")
+             (,ledger-operate
+              (lambda (x) ((record 'copy!) x (append '(ledger stage) target))) path index))))
 
      (define ledger-peer!
        '(lambda (record name messenger)
@@ -240,6 +254,17 @@
                 ((record 'slice!) '(control scratch) '(index))
                 ((record 'serialize) '(control scratch))))))
 
+     (define ledger-library
+       `(lambda (record)
+          (lambda (function)
+            (case function
+              ((get) (lambda args (apply ,ledger-get (cons record args))))
+              ((set!) (lambda args (apply ,ledger-set! (cons record args))))
+              ((copy!) (lambda args (apply ,ledger-copy! (cons record args))))
+              ((index) (lambda args (apply ,ledger-index (cons record args))))
+              ((peers) (lambda args (apply ,ledger-peers (cons record args))))
+              (else (error 'missing-function "Function not found"))))))
+
      (let* ((seed (byte-vector->hex-string
                    (sync-hash (expression->byte-vector secret))))
             (result (sync-http 'get (append ,cryptography "/signature/key/" seed)))
@@ -255,8 +280,9 @@
      ((record 'set!) '(ledger chain index) 0) 
      ((record 'set!) '(control step 0) step!)
      ((record 'set!) '(control local ledger-config) ledger-config-local)
-     ((record 'set!) '(control local ledger-set!) ledger-set!)
      ((record 'set!) '(control local ledger-get) ledger-get)
+     ((record 'set!) '(control local ledger-set!) ledger-set!)
+     ((record 'set!) '(control local ledger-copy!) ledger-copy!)
      ((record 'set!) '(control local ledger-pin!) ledger-pin!)
      ((record 'set!) '(control local ledger-unpin!) ledger-unpin!)
      ((record 'set!) '(control local ledger-index) ledger-index)
@@ -265,5 +291,6 @@
      ((record 'set!) '(control remote ledger-config) ledger-config-remote)
      ((record 'set!) '(control remote ledger-prove) ledger-prove)
      ((record 'set!) '(control remote ledger-synchronize) ledger-synchronize)
+     ((record 'set!) '(record library ledger) ledger-library)
 
      "Installed ledger"))

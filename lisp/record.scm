@@ -12,6 +12,8 @@
                (begin (display (car exprs)) (display " ") (loop (cdr exprs))))))
 
        (define sync-null-expr (byte-vector->expression (expression->byte-vector (sync-null))))
+
+       (define sync-struct (sync-cons (sync-null) (sync-null)))
        
        (define (key-bits key)
          (let loop-1 ((bytes (map (lambda (x) x) (sync-hash key))) (ret '()))
@@ -36,7 +38,7 @@
 
        (define (obj->node value)
          (cond ((sync-pair? value) value)
-               ((procedure? value) (sync-cons (sync-null) (value)))
+               ((procedure? value) (sync-cons sync-struct (value)))
                ((byte-vector? value) (append #u(0) value)) 
                (else (append #u(1) (expression->byte-vector value)))))
 
@@ -49,9 +51,8 @@
                   (else (error 'invalid-type "Type encoding unrecognized"))))
                ((sync-pair? node)
                 (if (sync-null? node) node
-                    (let ((left (sync-car node)))
-                      (if (not (and (sync-pair? left) (sync-null? left))) node
-                          (lambda () (sync-cdr node))))))
+                    (if (not (equal? (sync-car node) sync-struct)) node
+                        (lambda () (sync-cdr node)))))
                (else (error 'invalid-type "Invalid value type"))))
 
        (define (node->info node)
@@ -400,7 +401,7 @@
                 (if (null? path) (obj->node value)
                     (let* ((key (car path))
                            (node (if node node (dir-new)))
-                           ;; (node (if force-under? (dir-underlay node) node))
+                           (node (if force-under? (dir-underlay node) node))
                            (old (dir-get node key)))
                       (if (and (or over? (and (sync-pair? node) (dir-overlay? node)))
                                (not force-under?))
@@ -412,15 +413,16 @@
 
        (define (r-valid? node)
          (let loop-1 ((node node))
-           (if (not (sync-pair? node)) #t
-               (if (not (dir-valid? node)) #f
-                   (let loop-2 ((keys (dir-all node)))
-                     (if (null? keys) #t
-                         (let ((child (dir-get node (car keys))))
-                           (if (and (dir-overlay? node)
-                                    (not (dir-overlayed? node (car keys) child))) #f
-                               (if (not (loop-2 (cdr keys))) #f
-                                   (loop-1 child))))))))))
+           (cond ((not (sync-pair? node)) #t)
+                 ((equal? (sync-car node) sync-struct) #t)
+                 ((not (dir-valid? node)) #f)
+                 (else (let loop-2 ((keys (dir-all node)))
+                         (if (null? keys) #t
+                             (let ((child (dir-get node (car keys))))
+                               (if (and (dir-overlay? node)
+                                        (not (dir-overlayed? node (car keys) child))) #f
+                                        (if (not (loop-2 (cdr keys))) #f
+                                            (loop-1 child))))))))))
 
        (define (r-complete? path)
          (let ((node (r-read (map key->bytes path))))
@@ -431,13 +433,14 @@
 
        (define (record-get path)
          (let ((path (map key->bytes path)))
-           (let ((node (r-read path)))
-             (cond ((not node) '(nothing ()))
-                   ((boolean? node) '(unknown ()))
-                   ((sync-pair? node)
-                    `(directory ,(map bytes->key (dir-all node))
-                                ,(not (dir-overlay? node))))
-                   (else `(object ,(node->obj node)))))))
+           (let ((obj (node->obj (r-read path))))
+             (cond ((not obj) '(nothing ()))
+                   ((boolean? obj) '(unknown ()))
+                   ((sync-pair? obj)
+                    `(directory ,(map bytes->key (dir-all obj))
+                                ,(not (dir-overlay? obj))))
+                   ((procedure? obj) `(structure ,(obj)))
+                   (else `(object ,obj))))))
 
        (define (record-equal? source path)
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
@@ -493,7 +496,8 @@
                         (if child (dir-set node (car path) child)
                             (let ((node-new (dir-delete node (car path))))
                               (if (equal? node-new (dir-new)) #f node-new))))))))
-             (let ((path (map key->bytes path)))
+             (let ((path (map key->bytes path))
+                   (value (if (sync-pair? value) (lambda () value) value)))
                (if (not (r-complete? path)) #f
                    (r-write! path value #t))))
          #t)
@@ -574,7 +578,7 @@
          (let ((path (map key->bytes path)))
            (r-write! path
                      (let recurse ((node (r-read path)))
-                       (if (or (not (sync-pair? node)) (dir-overlay? node)) node
+                       (if (or (not (sync-pair? (node->obj node))) (dir-overlay? node)) node
                            (let loop ((node node) (keys (dir-all node)))
                              (if (null? keys) (dir-align node)
                                  (loop (dir-set node (car keys)
@@ -650,6 +654,7 @@
          (get (lambda () state))
          (set (lambda (x) (set! state x)))
          (record ((eval record-new) get set)))
+    ((record 'set!) '(record library record) record-new)
     (let loop ((scripts scripts))
       (if (null? scripts)
           (set! *sync-state* (sync-cons transition-bytes state))
