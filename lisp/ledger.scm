@@ -34,7 +34,8 @@
                       (messenger (eval (cadr (assoc 'messenger config))))
                       (message (,',signature-sign '(ledger-synchronize)))
                       (result (messenger message)))
-                 ((record 'deserialize!) '(ledger stage *peers* ,name) result))))
+                 ((record 'deserialize!) '(ledger stage *peers* ,name) result)
+                 )))
            ,,blocking?)))
 
      (define call-step
@@ -158,23 +159,23 @@
 
      (define ledger-operate
        `(lambda (operate path index)
-         (if (and (not index) (not (null? path)) (eq? (car path) '*state*))
-             (operate (append '(ledger stage) path))
-             (let* ((chain-path (,ledger-path record index))
-                    (index (cadr (operate (append chain-path '(index)))))
-                    (pinned (operate (append `(ledger pinned ,index) path))))
-               (if (or (eq? (car pinned) 'object) (and (eq? (car pinned) 'directory) (caddr pinned))) pinned
-                   (cond ((null? path) '(directory (*state* *peers*) #t))
-                         ((eq? (car pinned) 'object) pinned)
-                         ((and (eq? (car path) '*peers*) (null? (cdr path)))
-                          (operate (append chain-path '(*peers*))))
-                         ((and (eq? (car path) '*state*))
-                          (operate (append `(ledger states ,index) (cdr path))))
-                         ((and (eq? (car path) '*peers*))
-                          (let ((store '(control scratch get)))
-                            (,ledger-fetch record path index store)
-                            (operate (append store (list-tail path 2)))))
-                         (else (error 'path-error "Path must start with *state* or *peer*"))))))))
+          (if (and (not index) (not (null? path)) (eq? (car path) '*state*))
+              (operate (append '(ledger stage) path))
+              (let* ((chain-path (,ledger-path record index))
+                     (index (cadr (operate (append chain-path '(index)))))
+                     (pinned (operate (append `(ledger pinned ,index) path))))
+                (if (or (eq? (car pinned) 'object) (and (eq? (car pinned) 'directory) (caddr pinned))) pinned
+                    (cond ((null? path) '(directory (*state* *peers*) #t))
+                          ((eq? (car pinned) 'object) pinned)
+                          ((and (eq? (car path) '*peers*) (null? (cdr path)))
+                           (operate (append chain-path '(*peers*))))
+                          ((and (eq? (car path) '*state*))
+                           (operate (append `(ledger states ,index) (cdr path))))
+                          ((and (eq? (car path) '*peers*))
+                           (let ((store '(control scratch get)))
+                             (,ledger-fetch record path index store)
+                             (operate (append store (list-tail path 2)))))
+                          (else (error 'path-error "Path must start with *state* or *peer*"))))))))
 
      (define ledger-get
        `(lambda*

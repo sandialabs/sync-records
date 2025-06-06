@@ -401,7 +401,7 @@
                 (if (null? path) (obj->node value)
                     (let* ((key (car path))
                            (node (if node node (dir-new)))
-                           ;; (node (if force-under? (dir-underlay node) node))
+                           (node (if force-under? (dir-underlay node) node))
                            (old (dir-get node key)))
                       (if (and (or over? (and (sync-pair? node) (dir-overlay? node)))
                                (not force-under?))
