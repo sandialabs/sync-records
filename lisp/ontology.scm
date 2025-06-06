@@ -14,8 +14,11 @@
     '(lambda (record path index)
        (let ((ledger ((eval (cadr ((record 'get) '(record library ledger)))) record))
              (record-init (eval (cadr ((record 'get) '(record library record))))))
+         (let ((result ((ledger 'get) path index)))
+           (if (eq? (car result) 'nothing) result
+               ((record 'set!) '(control scratch triples) (cadr result))))
          (let ((root-get (lambda ()
-                           (let ((result ((ledger 'get) path index)))
+                           (let ((result ((record 'get) '(control scratch triples))))
                              (if (eq? (car result) 'nothing) #f
                                  (sync-cdr (cadr result))))))
                (root-set! (lambda () (error 'set-error "Read-only record"))))
