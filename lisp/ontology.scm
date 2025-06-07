@@ -94,18 +94,70 @@
   (define ontology-insert!
     `(lambda*
       (record s p o graph)
-       (let ((graph (if graph graph '(*state* *ontology*)))
-             (ontology-assign ,ontology-assign))
-         (let ((s (ontology-assign s))
-               (p (ontology-assign p))
-               (o (ontology-assign o)))
-           (,ontology-operate record s p o graph `(,s ,p ,o))))))
+      (let ((graph (if graph graph '(*state* *ontology*)))
+            (ontology-assign ,ontology-assign))
+        (let ((s (ontology-assign s))
+              (p (ontology-assign p))
+              (o (ontology-assign o)))
+          (,ontology-operate record s p o graph `(,s ,p ,o))))))
 
   (define ontology-remove!
     `(lambda*
       (record s p o graph)
-       (let ((graph (if graph graph '(*state* *ontology*))))
-         (,ontology-operate record s p o graph #f))))
+      (let ((graph (if graph graph '(*state* *ontology*))))
+        (,ontology-operate record s p o graph #f))))
+
+  (define ontology-insert-batch!
+    `(lambda*
+      (record triples graph)
+      (let ((graph (if graph graph '(*state* *ontology*)))
+            (ontology-assign ,ontology-assign))
+        (let loop ((triples triples))
+          (if (null? triples) #t
+              (let ((s (caar triples)) (p (cadar triples)) (o (caddar triples)))
+                (let ((s (ontology-assign s))
+                      (p (ontology-assign p))
+                      (o (ontology-assign o)))
+                  (,ontology-operate record s p o graph `(,s ,p ,o)))
+                (loop (cdr triples))))))))
+
+  (define ontology-remove-batch!
+    `(lambda*
+      (record triples graph)
+      (let ((graph (if graph graph '(*state* *ontology*))))
+        (let loop ((triples triples))
+          (if (null? triples) #t
+              (let ((s (caar triples)) (p (cadar triples)) (o (caddar triples)))
+                (,ontology-operate record s p o graph #f)
+                (loop (cdr triples))))))))
+
+  (define ontology-dfs
+    `(lambda*
+      (record term depth as-quads)
+      (let ((select ,ontology-select)
+            (seen (hash-table)))
+        (let recurse ((term term) (depth depth))
+          (cond ((= depth 0) '())
+                ((not (eq? (car term) 'ref)) '())
+                ((eq? (caadr term) '~) '())
+                ((seen term) '())
+                (else (let* ((parts (let loop ((head '()) (tail (cadr term)))
+                                      (if (eq? (car tail) '*state*)
+                                          `(,(reverse head) ,tail)
+                                          (loop (cons (car tail) head) (cdr tail)))))
+                             (result (select record `(ref ,(cadr parts)) '(var) '(var)
+                                             (append (car parts) '(*state* *ontology*))))
+                             (prepend (lambda (t)
+                                        (map (lambda (x)
+                                               (if (or (not (eq? (car x) 'ref)) (eq? (caadr x) '~)) x
+                                                   `(ref ,(append (car parts) (cadr x))))) t))))
+                        (if (eq? (car result) 'nothing) ()
+                            (let loop ((in (map prepend (cadr result))) (out '()))
+                              (if (null? in) (begin (set! (seen term) #t) out)
+                                  (loop (cdr in) (append (list (car in))
+                                                         (recurse (cadar in) (- depth 1))
+                                                         (recurse (caddar in) (- depth 1))
+                                                         out))))))))))))
 
   (define ontology-library
     `(lambda (record)
@@ -114,9 +166,14 @@
            ((select) (lambda args (apply ,ontology-select (cons record args))))
            ((insert!) (lambda args (apply ,ontology-insert! (cons record args))))
            ((remove!) (lambda args (apply ,ontology-remove! (cons record args))))
+           ((insert-batch!) (lambda args (apply ,ontology-insert-batch! (cons record args))))
+           ((remove-batch!) (lambda args (apply ,ontology-remove-batch! (cons record args))))
            (else (error 'missing-function "Function not found"))))))
   
   ((record 'set!) '(control local ontology-select) ontology-select)
   ((record 'set!) '(control local ontology-insert!) ontology-insert!)
   ((record 'set!) '(control local ontology-remove!) ontology-remove!)
+  ((record 'set!) '(control local ontology-insert-batch!) ontology-insert-batch!)
+  ((record 'set!) '(control local ontology-remove-batch!) ontology-remove-batch!)
+  ((record 'set!) '(control local ontology-dfs) ontology-dfs)
   ((record 'set!) '(record library ontology) ontology-library))
