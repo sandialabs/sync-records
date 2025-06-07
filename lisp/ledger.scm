@@ -34,8 +34,7 @@
                       (messenger (eval (cadr (assoc 'messenger config))))
                       (message (,',signature-sign '(ledger-synchronize)))
                       (result (messenger message)))
-                 ((record 'deserialize!) '(ledger stage *peers* ,name) result)
-                 )))
+                 ((record 'deserialize!) '(ledger stage *peers* ,name) result))))
            ,,blocking?)))
 
      (define call-step
@@ -109,12 +108,12 @@
 
      (define peer-prove
        `(lambda (record name chain-path remote-path)
-          (let* ((config (cadr ((record 'get) `(ledger meta peers ,name))))
-                 (public-key (eval (cadr (assoc 'public-key config))))
-                 (messenger (eval (cadr (assoc 'messenger config))))
-                 (index (cadr ((record 'get) (append chain-path '(index)))))
-                 (i-remote (cadr ((record 'get) (append chain-path `(*peers* ,name index))))))
-            (messenger (,signature-sign `(ledger-prove ,remote-path ,i-remote))))))
+          (let ((config ((record 'get) `(ledger meta peers ,name))))
+            (if (eq? (car config) 'nothing) (error 'peer-error "Peer not found")
+                (let ((messenger (eval (cadr (assoc 'messenger (cadr config)))))
+                      (index (cadr ((record 'get) (append chain-path '(index)))))
+                      (i-remote (cadr ((record 'get) (append chain-path `(*peers* ,name index))))))
+                  (messenger (,signature-sign `(ledger-prove ,remote-path ,i-remote))))))))
 
      (define ledger-fetch
        `(lambda (record path index store)
