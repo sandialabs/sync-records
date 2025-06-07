@@ -53,7 +53,7 @@
             ((record 'copy!) '(ledger stage *state*) `(ledger states ,(+ index 1)))
             ((record 'copy!) '(ledger previous) '(control scratch previous))
             ((record 'set!) '(control scratch index) (+ index 1))
-            ((record 'align!) '(control scratch))
+            ((record 'infer!) '(control scratch))
             ((record 'prune!) '(control scratch) '(*state*) #t)
             ((record 'copy!) '(control scratch) '(ledger chain))
             (+ index 1))))
@@ -219,7 +219,7 @@
                      (index (cadr ((record 'get) (append chain-path '(index)))))
                      (pinned ((record 'get) (append `(ledger pinned ,index) path))))
                 ((record 'copy!) chain-path '(control scratch local))
-                ((record 'align!) '(control scratch local))
+                ((record 'infer!) '(control scratch local))
                 (if (or (eq? (car pinned) 'object) (and (eq? (car pinned) 'directory) (caddr pinned)))
                     ((record 'merge!) `(ledger pinned ,index) '(control scratch local))
                     (begin
@@ -249,7 +249,7 @@
               (error 'peer-error "Could not verify assertion")
               (let ((chain-path (,ledger-path record -1)))
                 ((record 'copy!) chain-path '(control scratch))
-                ((record 'align!) '(control scratch))
+                ((record 'infer!) '(control scratch))
                 ((record 'slice!) '(control scratch) '(index))
                 ((record 'serialize) '(control scratch))))))
 
