@@ -708,7 +708,7 @@
        (if (and (pair? query) (eq? (car query) '*administer*)
                 (equal? (sync-hash (expression->byte-vector (cadr query)))
                         ,secret-hash))
-           (let ((result (eval caddr query)))
+           (let ((result (eval (caddr query))))
              (cons result *sync-state*))
            (let* ((state (sync-cdr *sync-state*))
                   (get (lambda () state))
