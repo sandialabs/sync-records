@@ -527,6 +527,7 @@
          path and recursively delete empty parent directories as necessary.
 
          > path (list sym|vec): path from the record root to the data
+         > value (exp|sync-pair): data to be stored at the path
          < return (exp): boolean indicating success of the operation"
          (if (eq? value #f)
              (root-set!

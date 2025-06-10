@@ -66,9 +66,9 @@
 
   (define input
     `((,ledger-1 . *step*)
-      (,ledger-1 . (ledger-set! (*state* do pin this) 'yes))
-      (,ledger-1 . (ledger-set! (*state* do pin that) 'yes))
-      (,ledger-1 . (ledger-set! (*state* do not pin) 'no))
+      (,ledger-1 . (ledger-set! (*state* do pin this) yes))
+      (,ledger-1 . (ledger-set! (*state* do pin that) yes))
+      (,ledger-1 . (ledger-set! (*state* do not pin) no))
       (,ledger-1 . *step*)
       (,ledger-1 . (ledger-get) (*state* do pin) 2)
       (,ledger-1 . (ledger-pin! (*state* do pin this) 2))

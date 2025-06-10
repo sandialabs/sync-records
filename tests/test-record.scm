@@ -44,8 +44,8 @@
     ;; serialization
     (assert '((record 'deserialize!) '(a*) ((record 'serialize) '(a))) #t)
     (assert '((record 'equal?) '(a* b) '(a b)) #t)
-    ;; (assert '((record 'deserialize!) '(a*) ((record 'serialize) '(a))) #t)
-    ;; (assert '((record 'equal?) '(a*) '(a)) #t)
+    (assert '((record 'deserialize!) '(a*) ((record 'serialize) '(a))) #t)
+    (assert '((record 'equal?) '(a*) '(a)) #t)
 
     ;; pruning
     (assert '((record 'set!) '(b a c d) 4) #t)
