@@ -1,6 +1,20 @@
 (lambda (cryptography blocking? window)
-  `(lambda (record secret) 
+  "> cryptography (str): fully-qualified URL pointing the cryptographic signature service
+  > blocking? (bool): if #t, then all network connections block until success or timeout
+  > window (uint): number of indices (steps) to keep old state data or #f if keep forever
+  < return (fnc): configured ledger setup function"
 
+  `(lambda (record secret) 
+     "Extend the record interface to include ledger functionality. The
+     ledger extension provides logic for version-controlling stateful.
+     Optionally, ledgers be configured to delete older states while
+     persisting explicitly 'pinned' exceptions. Finally, ledgers support
+     peering, syncing, and reading historical state from other ledgers
+     across transitive peer-to-peer connections.
+
+     > record (fnc): library to access record commands
+     > secret (str): the root secret used to generate cryptographic materials
+     < return (str): success message"
      (define signature-sign
        '(lambda (message)
           "Accept a message and return an assertion containing the ledger's public key and signature"
@@ -103,6 +117,10 @@
 
      (define ledger-index
        `(lambda (record)
+          "Return the current index (i.e., the lowest index that has not been finalized)
+
+          > record (fnc): library to access record commands
+          < return (uint): the current index"
           (let ((chain-path (,ledger-path record -1)))
             (cadr ((record 'get) (append chain-path '(index)))))))
 
@@ -130,6 +148,12 @@
 
      (define ledger-pin!
        `(lambda (record path index)
+          "Pin a historical state to prevent automatic deletion or remote state for caching
+
+          > record (fnc): library to access record commands
+          > path (list sym|vec): path to the data to pin
+          > index (int): step number of the data to pin
+          < return (bool): boolean indicating success of the operation"
           (let* ((chain-path (,ledger-path record index))
                  (index (cadr ((record 'get) (append chain-path '(index))))))
             ((record 'copy!) chain-path '(control scratch local))
@@ -148,6 +172,12 @@
 
      (define ledger-unpin!
        `(lambda (record path index)
+          "Unpin previously pinned data
+
+          > record (fnc): library to access record commands
+          > path (list sym|vec): path to the content to unpin
+          > index (int): step number of the content to unpin
+          < return (bool): boolean indicating success of the operation"
           (let* ((chain-path (,ledger-path record index))
                  (index (cadr ((record 'get) (append chain-path '(index))))))
             (cond ((and (> (length path) 1) (eq? (car path) '*state*))
@@ -179,10 +209,31 @@
      (define ledger-get
        `(lambda*
          (record path index)
+          "Retrieve the data at the given path and index, potentially from other peers
+
+          > record (fnc): library to access record commands
+          > path (list sym|vec): path to the content to retrieve
+          > index (int): step number of the content to retrieve
+          < return (sym . (list exp)): list containing the type and value of the data
+              - 'object type indicates a simple lisp-serializable value
+              - 'structure type indicates a complex value represented by sync-pair?
+              - 'directory type indicates an intermediate directory node
+                - the second item is a list of known subpath segments
+                - the third item is a bool indicating whether the directory is complete
+                  (i.e., none of its underlying data has been pruned)
+              - 'nothing type indicates that no data is found at the path
+              - 'unknown type indicates the path has been pruned"
          (,ledger-operate (lambda (x) ((record 'get) x)) path index)))
 
      (define ledger-set!
        `(lambda (record path value)
+          "Write the value to the path. Recursively generate parent
+          directories if necessary.
+
+          > record (fnc): library to access record commands
+          > path (list sym|vec): path to the specified value
+          > value (exp|sync-pair): data to be stored at the path
+          < return (bool): boolean indicating success of the operation"
           (if (or (null? path) (not (eq? (car path) '*state*)))
               (error 'path-error "first path segment must be *state*")
               ((record 'set!) (append '(ledger stage) path) value))))
@@ -190,6 +241,13 @@
      (define ledger-copy!
        `(lambda*
          (record path target index)
+          "Copy the value from the specified path. Recursively generate parent
+          directories if necessary.
+
+          > record (fnc): library to access record commands
+          > path (list sym|vec): path to the source location
+          > target (list sym|vec): path to the target location
+          < return (bool): boolean indicating success of the operation"
          (if (or (null? target) (not (eq? (car target) '*state*)))
              (error 'path-error "First segment of target path must be *state*")
              (,ledger-operate
@@ -197,6 +255,12 @@
 
      (define ledger-peer!
        '(lambda (record name messenger)
+          "Establish a persistent connection with another peer
+
+          > record (fnc): library to access record commands
+          > name (sym): unique symbol to refer to the peer
+          > messenger (fnc): function to message (single arg) to send to the peer
+          < return (bool): boolean indicating success of the operation"
           ((record 'set!) `(ledger stage *peers* ,name) #f)
           (if (not messenger) ((record 'set!) `(ledger meta peers ,name) #f)
               ((record 'set!) `(ledger meta peers ,name)
@@ -205,6 +269,10 @@
 
      (define ledger-peers
        '(lambda (record)
+          "List all currently active peers
+
+          > record (fnc): library to access record commands
+          < return (list sym): list of peer names"
           (let ((names (cadr ((record 'get) '(ledger meta peers)))))
             (let loop ((names names) (result '()))
               (if (null? names) (reverse result)

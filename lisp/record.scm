@@ -522,13 +522,14 @@
 
        (define (record-set! path value)
          "Write the value to the path. Recursively generate parent
-         directories necessary. If necessary, force all parent directories into
-         a new underlayed form. If the value is #f, then delete the data at the
-         path and recursively delete empty parent directories as necessary.
+         directories if necessary. If necessary, force all parent directories
+         into a new underlayed form. If the value is #f, then delete the data
+         at the path and recursively delete empty parent directories as
+         necessary.
 
          > path (list sym|vec): path from the record root to the data
          > value (exp|sync-pair): data to be stored at the path
-         < return (exp): boolean indicating success of the operation"
+         < return (bool): boolean indicating success of the operation"
          (if (eq? value #f)
              (root-set!
               (let ((path (map key->bytes path)))
@@ -546,14 +547,14 @@
 
        (define (record-copy! source path)
          "Copy data from the source path to the target path.
-         Recursively generate parent directories necessary. If necessary, force
-         all parent directories into a new underlayed form. If the value is #f,
-         then delete the data at the path and recursively delete empty parent
-         directories as necessary.
+         Recursively generate parent directories if necessary. If
+         necessary, force all parent directories into a new underlayed form. If
+         the value is #f, then delete the data at the path and recursively
+         delete empty parent directories as necessary.
 
          > source (list sym|vec): path from the record root to the source data
          > path (list sym|vec): path from the record root to the target data
-         < return (exp): boolean indicating success of the operation"
+         < return (bool): boolean indicating success of the operation"
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (if (or (not (r-complete? source)) (not (r-complete? path))) #f
                (let ((value (r-read source)))
@@ -566,7 +567,7 @@
 
          > path (list sym|vec): path from the record root to the target location
          > serialization (exp): expression containing the serialized data
-         < return (exp): boolean indicating success of the operation"
+         < return (bool): boolean indicating success of the operation"
          (let ((path (map key->bytes path)))
            (let* ((proc (lambda (x)
                           (let ((k (car x)) (v (cadr x)))
@@ -588,7 +589,7 @@
          > path (list sym|vec): path from the record root to the target directory 
          > subpath (exp): subpath from the target directory to target data 
          > keep-key? (bool): if #t, then retain the path segment in the parent directory
-         < return (exp): boolean indicating success of the operation"
+         < return (bool): boolean indicating success of the operation"
          (let ((path (map key->bytes path)) (subpath (map key->bytes subpath)))
            (if (boolean? (r-read (append path subpath))) #f
                (begin
@@ -611,7 +612,7 @@
 
          > path (list sym|vec): path from the record root to the target directory 
          > subpath (exp): subpath from the target directory to target data 
-         < return (exp): boolean indicating success of the operation"
+         < return (bool): boolean indicating success of the operation"
          (let ((path (map key->bytes path)) (subpath (map key->bytes subpath)))
            (r-write! path
                      (let loop ((node (r-read path)) (subpath subpath))
@@ -629,7 +630,7 @@
 
          > source (list sym|vec): path from the record root to the source directory 
          > path (list sym|vec): path from the record root to the target directory 
-         < return (exp): boolean indicating success of the operation"
+         < return (bool): boolean indicating success of the operation"
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (let ((node-1 (r-read source)) (node-2 (r-read path)))
              (if (and (not (boolean? node-1)) (not (boolean? node-2))
@@ -657,7 +658,7 @@
          pruned) subdirectories.
 
          > path (list sym|vec): path from the record root to the target directory
-         < return (exp): boolean indicating success of the operation"
+         < return (bool): boolean indicating success of the operation"
          (let ((path (map key->bytes path)))
            (r-write! path
                      (let recurse ((node (r-read path)))
