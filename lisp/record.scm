@@ -1,5 +1,16 @@
 (lambda (secret control . scripts)
+  "Install the record interface into the Journal SDK. The Record
+  interface is the recommended core data model for all synchronic web
+  journals. It abstracts away the underlying hash binary tree by provide
+  a path-based mechanism to traceably read, write, compare, and prune
+  lisp-style data.
 
+  > secret (str): the root secret used to generate cryptographic materials
+  > control (fnc): control function that determining logic for end-user queries
+    - functions are of the form (lambda (record secret-hash query) ...)
+  > scripts (list fnc): list of functions to setup additional special logic
+    - functions are of the form (lambda (record secret) ...)
+  < return (str): success message"
   (define secret-hash (sync-hash (expression->byte-vector secret)))
 
   (define record-new
@@ -429,9 +440,19 @@
            (if (not node) #t
                (not (dir-overlay? node)))))
 
-       ;; --- interface functions (all directories) ---
-
        (define (record-get path)
+         "Retrieve the data at the specified path.
+
+         > path (list sym|vec): path from the record root to data
+         < return (sym . (list exp)): list containing the type and value of the data
+             - 'object type indicates a simple lisp-serializable value
+             - 'structure type indicates a complex value represented by sync-pair?
+             - 'directory type indicates an intermediate directory node
+               - the second item is a list of known subpath segments
+               - the third item is a bool indicating whether the directory is complete
+                 (i.e., none of its underlying data has been pruned)
+             - 'nothing type indicates that no data is found at the path
+             - 'unknown type indicates the path has been pruned"
          (let ((path (map key->bytes path)))
            (let ((obj (node->obj (r-read path))))
              (cond ((not obj) '(nothing ()))
@@ -443,16 +464,31 @@
                    (else `(object ,obj))))))
 
        (define (record-equal? source path)
+         "Indicate whether two paths that contain identical data
+
+         > path (list sym|vec): path from the record root to source data
+         > target (list sym|vec): path from the record root to target data
+         < return (bool): if paths are equal then #t, otherwise #f"
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (equal? (r-read source) (r-read path))))
 
        (define (record-equivalent? source path)
+         "Indicate whether two paths point to data that was formed
+         from an identical originating data structure (before possible pruning)
+
+         > path (list sym|vec): path from the record root to source data
+         > target (list sym|vec): path from the record root to target data
+         < return (bool): if paths are equivalent then #t, otherwise #f"
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (let ((val-1 (r-read source)) (val-2 (r-read path)))
              (equal? (if (sync-pair? val-1) (dir-digest val-1) #f)
                      (if (sync-pair? val-2) (dir-digest val-2) #f)))))
 
        (define (record-serialize path)
+         "Obtain a serialized representation of all data under the path
+
+         > path (list sym|vec): path from the record root to the data
+         < return (exp): lisp-serialized contents"
          (let ((path (map key->bytes path)))
            (let ((node (r-read path)))
              (if (not node) #f
@@ -484,9 +520,16 @@
                                          (list (car x) (list (cadr x) (caddr x)))))))
                      (map (lambda (x) (compact (map shorten x))) ls)))))))
 
-       ;; --- interface functions (unlocked directories) ---
-       
        (define (record-set! path value)
+         "Write the value to the path. Recursively generate parent
+         directories if necessary. If necessary, force all parent directories
+         into a new underlayed form. If the value is #f, then delete the data
+         at the path and recursively delete empty parent directories as
+         necessary.
+
+         > path (list sym|vec): path from the record root to the data
+         > value (exp|sync-pair): data to be stored at the path
+         < return (bool): boolean indicating success of the operation"
          (if (eq? value #f)
              (root-set!
               (let ((path (map key->bytes path)))
@@ -503,6 +546,15 @@
          #t)
 
        (define (record-copy! source path)
+         "Copy data from the source path to the target path.
+         Recursively generate parent directories if necessary. If
+         necessary, force all parent directories into a new underlayed form. If
+         the value is #f, then delete the data at the path and recursively
+         delete empty parent directories as necessary.
+
+         > source (list sym|vec): path from the record root to the source data
+         > path (list sym|vec): path from the record root to the target data
+         < return (bool): boolean indicating success of the operation"
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (if (or (not (r-complete? source)) (not (r-complete? path))) #f
                (let ((value (r-read source)))
@@ -510,34 +562,34 @@
                    (r-write! path (node->obj value) #t)
                    #t)))))
 
-       (define (record-deserialize! path raw)
+       (define (record-deserialize! path serialization)
+         "Validate and write serialized data to the specified path
+
+         > path (list sym|vec): path from the record root to the target location
+         > serialization (exp): expression containing the serialized data
+         < return (bool): boolean indicating success of the operation"
          (let ((path (map key->bytes path)))
            (let* ((proc (lambda (x)
                           (let ((k (car x)) (v (cadr x)))
                             (cond ((string? v) `(define ,k ,(hex-string->byte-vector v)))
                                   ((pair? v) `(define ,k (sync-cons ,(car v) ,(cadr v))))
                                   (else '())))))
-                  (expr `(begin (define n-0 (sync-null)) ,@(map proc (reverse raw))))
+                  (expr `(begin (define n-0 (sync-null))
+                                ,@(map proc (reverse serialization))))
                   (node (eval expr)))
              (if (not (r-valid? node))
                  (error 'deserialization-failure "Invalid serialization expression")
                  (begin (r-write! path node #t) #t)))))
        
-       ;; --- interface functions (locked directories) ---
-       
-       (define (record-slice! path subpath)
-         (let ((path (map key->bytes path)) (subpath (map key->bytes subpath)))
-           (r-write! path
-                     (let loop ((node (r-read path)) (subpath subpath))
-                       (if (or (not node) (not (sync-pair? node)) (null? subpath)) node
-                           (let ((key (car subpath)))
-                             (dir-slice (dir-overlay node key
-                                                     (loop (dir-get node key)
-                                                           (cdr subpath)))
-                                        key)))))
-           #t))
-
        (define* (record-prune! path subpath keep-key?)
+         "Prune specified data from a directory while maintaining the
+         original hashes. If executed on directory that has not been previously
+         pruned or sliced, then the directory becomes an overlayed directory.
+
+         > path (list sym|vec): path from the record root to the target directory 
+         > subpath (exp): subpath from the target directory to target data 
+         > keep-key? (bool): if #t, then retain the path segment in the parent directory
+         < return (bool): boolean indicating success of the operation"
          (let ((path (map key->bytes path)) (subpath (map key->bytes subpath)))
            (if (boolean? (r-read (append path subpath))) #f
                (begin
@@ -552,29 +604,61 @@
                                 (if (equal? node-new (dir-new)) #f node-new)))))))
                  #t))))
 
+       (define (record-slice! path subpath)
+         "Prune all data from directory EXCEPT for the specified path
+         while maintaining the original hashes. If executed on directory that
+         has not been previously pruned or sliced, then the directory becomes
+         an overlayed directory.
+
+         > path (list sym|vec): path from the record root to the target directory 
+         > subpath (exp): subpath from the target directory to target data 
+         < return (bool): boolean indicating success of the operation"
+         (let ((path (map key->bytes path)) (subpath (map key->bytes subpath)))
+           (r-write! path
+                     (let loop ((node (r-read path)) (subpath subpath))
+                       (if (or (not node) (not (sync-pair? node)) (null? subpath)) node
+                           (let ((key (car subpath)))
+                             (dir-slice (dir-overlay node key
+                                                     (loop (dir-get node key)
+                                                           (cdr subpath)))
+                                        key)))))
+           #t))
+
+
        (define (record-merge! source path)
+         "Recursively combine data from two equivalent directories.
+
+         > source (list sym|vec): path from the record root to the source directory 
+         > path (list sym|vec): path from the record root to the target directory 
+         < return (bool): boolean indicating success of the operation"
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (let ((node-1 (r-read source)) (node-2 (r-read path)))
              (if (and (not (boolean? node-1)) (not (boolean? node-2))
                       (not (equal? (dir-digest node-1) (dir-digest node-2)))) #f
-                 (let ((result
-                        (let loop-1 ((n-1 node-1) (n-2 node-2))
-                          (cond ((boolean? n-1) n-2)
-                                ((boolean? n-2) n-1)
-                                ((not (sync-pair? n-1)) n-2)
-                                ((not (sync-pair? n-2)) n-1)
-                                (else (let ((n-3 (dir-merge n-1 n-2)))
-                                        (let loop-2 ((n-3 n-3) (keys (dir-all n-3)))
-                                          (if (null? keys) n-3
-                                              (let* ((k (car keys))
-                                                     (v-1 (dir-get n-1 k))
-                                                     (v-2 (dir-get n-2 k))
-                                                     (v-3 (loop-1 v-1 v-2)))
-                                                (loop-2 (dir-overlay n-3 k v-3)
-                                                        (cdr keys)))))))))))
-                   (begin (r-write! path result) #t))))))
+                      (let ((result
+                             (let loop-1 ((n-1 node-1) (n-2 node-2))
+                               (cond ((boolean? n-1) n-2)
+                                     ((boolean? n-2) n-1)
+                                     ((not (sync-pair? n-1)) n-2)
+                                     ((not (sync-pair? n-2)) n-1)
+                                     (else (let ((n-3 (dir-merge n-1 n-2)))
+                                             (let loop-2 ((n-3 n-3) (keys (dir-all n-3)))
+                                               (if (null? keys) n-3
+                                                   (let* ((k (car keys))
+                                                          (v-1 (dir-get n-1 k))
+                                                          (v-2 (dir-get n-2 k))
+                                                          (v-3 (loop-1 v-1 v-2)))
+                                                     (loop-2 (dir-overlay n-3 k v-3)
+                                                             (cdr keys)))))))))))
+                        (begin (r-write! path result) #t))))))
 
-       (define (record-align! path)
+       (define (record-infer! path)
+         "Using the existing subdirectory structure, infer the
+         original hash tree that would have generated those (potentially
+         pruned) subdirectories.
+
+         > path (list sym|vec): path from the record root to the target directory
+         < return (bool): boolean indicating success of the operation"
          (let ((path (map key->bytes path)))
            (r-write! path
                      (let recurse ((node (r-read path)))
@@ -585,18 +669,6 @@
                                                 (recurse (dir-get node (car keys))))
                                        (cdr keys)))))) #t)
            #t))
-
-       (define (record-valid? path)
-         (let ((path (map key->bytes path)))
-           (let ((node (r-read path)))
-             (r-valid? node))))
-
-       (define (record-digest path)
-         (let ((path (map key->bytes path)))
-           (let ((node (r-read path)))
-             (if (sync-pair? node)
-                 (dir-digest node)
-                 node))))
 
        (define-macro (trace name)
          (let ((name-new (gensym)))
@@ -628,9 +700,7 @@
            ((merge!) record-merge!)
            ((slice!) record-slice!)
            ((prune!) record-prune!)
-           ((align!) record-align!)
-           ((valid?) record-valid?)
-           ((digest) record-digest)
+           ((infer!) record-infer!)
            ((serialize) record-serialize)
            ((deserialize!) record-deserialize!)
            (else (error 'unknown-function "Function not found"))))))
@@ -640,7 +710,7 @@
        (if (and (pair? query) (eq? (car query) '*administer*)
                 (equal? (sync-hash (expression->byte-vector (cadr query)))
                         ,secret-hash))
-           (let ((result (eval caddr query)))
+           (let ((result (eval (caddr query))))
              (cons result *sync-state*))
            (let* ((state (sync-cdr *sync-state*))
                   (get (lambda () state))
