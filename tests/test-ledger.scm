@@ -3,7 +3,7 @@
          (init (lambda (x) `(,x (,record-src
                                  ,(pass x)
                                  ,control-src
-                                 (,ledger-src "http://localhost:8887" #t 10))
+                                 (,ledger-src #t 10))
                                 "Installed record interface")))
          (form (lambda (x) `(,(car x)
                              ,(if (eq? (cadr x) '*step*) `(*step* ,(pass (car x)))

@@ -1,6 +1,5 @@
-(lambda (cryptography blocking? window)
-  "> cryptography (str): fully-qualified URL pointing the cryptographic signature service
-  > blocking? (bool): if #t, then all network connections block until success or timeout
+(lambda (blocking? window)
+  "> blocking? (bool): if #t, then all network connections block until success or timeout
   > window (uint): number of indices (steps) to keep old state data or #f if keep forever
   < return (fnc): configured ledger setup function"
 
@@ -19,24 +18,17 @@
        '(lambda (message)
           "Accept a message and return an assertion containing the ledger's public key and signature"
           (let* ((config (cadr ((record 'get) '(ledger meta config))))
-                 (crypto (cadr (assoc 'cryptography config)))
                  (public-key (cadr (assoc 'public-key config)))
                  (secret-key (cadr (assoc 'secret-key config)))
-                 (sec-hex (byte-vector->hex-string secret-key))
-                 (hash-hex (byte-vector->hex-string (sync-hash (expression->byte-vector message))))
-                 (result (sync-http 'get (append crypto "/signature/sign/" sec-hex "/" hash-hex)))
-                 (signature (hex-string->byte-vector (byte-vector->expression result))))
+                 (signature (crypto-sign secret-key (expression->byte-vector message))))
             (append message `(((public-key ,public-key) (signature ,signature)))))))
 
      (define signature-verify
        '(lambda (message assertion)
           "Verify the signature of a message given the message and assertion containing a public key"
-          (let* ((config (cadr ((record 'get) '(ledger meta config))))
-                 (crypto (cadr (assoc 'cryptography config)))
-                 (pub-hex (byte-vector->hex-string (cadr (assoc 'public-key assertion))))
-                 (sig-hex (byte-vector->hex-string (cadr (assoc 'signature assertion))))
-                 (hash-hex (byte-vector->hex-string (sync-hash (expression->byte-vector message)))))
-            (sync-http 'get (append crypto "/signature/verify/" pub-hex "/" sig-hex "/" hash-hex)))))
+          (let* ((public-key (cadr (assoc 'public-key assertion)))
+                 (signature (cadr (assoc 'signature assertion))))
+            (crypto-verify public-key signature (expression->byte-vector message)))))
 
      (define call-peer
        `(lambda (name)
@@ -332,15 +324,11 @@
               ((peers) (lambda args (apply ,ledger-peers (cons record args))))
               (else (error 'missing-function "Function not found"))))))
 
-     (let* ((seed (byte-vector->hex-string
-                   (sync-hash (expression->byte-vector secret))))
-            (result (sync-http 'get (append ,cryptography "/signature/key/" seed)))
-            (key-pair (byte-vector->expression result)) 
-            (public-key (hex-string->byte-vector (cadr (assoc 'public key-pair))))
-            (secret-key (hex-string->byte-vector (cadr (assoc 'private key-pair)))))
+     (let* ((key-pair (crypto-generate (expression->byte-vector secret)))
+            (public-key (car key-pair))
+            (secret-key (cdr key-pair)))
        ((record 'set!) '(ledger meta config)
         (list (list 'window ,window)
-              (list 'cryptography ,cryptography)
               (list 'public-key public-key)
               (list 'secret-key secret-key))))
 
