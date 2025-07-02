@@ -89,6 +89,15 @@
   (define ontology-select
     `(lambda*
       (record s p o graph index)
+      "Select triples matching (s, p, o) from the ontology graph.
+
+      > record (fnc): library to access record commands
+      > s (exp): subject
+      > p (exp): predicate
+      > o (exp): object
+      > graph (list|#f): graph path or #f to refer to the local graph
+      > index (int): ledger index
+      < return (list triples): list of matching triples"
       (,ontology-check s p o)
       (let ((graph (if graph graph '(*state* *ontology*)))
             (store (,ontology-store s p o))
@@ -113,6 +122,14 @@
   (define ontology-insert!
     `(lambda*
       (record s p o graph)
+      "Insert a triple (s, p, o) into the ontology graph.
+
+      > record (fnc): library to access record commands
+      > s (exp): subject
+      > p (exp): predicate
+      > o (exp): object
+      > graph (list|#f): graph path or default
+      < return (bool): success"
       (let ((graph (if graph graph '(*state* *ontology*)))
             (ontology-assign ,ontology-assign))
         (let ((s (ontology-assign s))
@@ -123,12 +140,26 @@
   (define ontology-remove!
     `(lambda*
       (record s p o graph)
+      "Remove a triple (s, p, o) from the ontology graph.
+
+      > record (fnc): library to access record commands
+      > s (exp): subject
+      > p (exp): predicate
+      > o (exp): object
+      > graph (list|#f): graph path or default
+      < return (bool): success"
       (let ((graph (if graph graph '(*state* *ontology*))))
         (,ontology-operate record s p o graph #f))))
 
   (define ontology-insert-batch!
     `(lambda*
       (record triples graph)
+      "Insert a batch of triples into the ontology graph.
+
+      > record (fnc): library to access record commands
+      > triples (list): list of triples
+      > graph (list|#f): graph path or default
+      < return (bool): success"
       (let ((graph (if graph graph '(*state* *ontology*)))
             (ontology-assign ,ontology-assign))
         (let loop ((triples triples))
@@ -143,6 +174,12 @@
   (define ontology-remove-batch!
     `(lambda*
       (record triples graph)
+      "Remove a batch of triples from the ontology graph.
+
+      > record (fnc): library to access record commands
+      > triples (list): list of triples
+      > graph (list|#f): graph path or default
+      < return (bool): success"
       (let ((graph (if graph graph '(*state* *ontology*))))
         (let loop ((triples triples))
           (if (null? triples) #t
@@ -153,6 +190,14 @@
   (define ontology-dfs
     `(lambda*
       (record term depth n-triples?)
+      "Depth-first search over the ontology graph, optionally formatting as an
+      N-triples document.
+
+      > record (fnc): library to access record commands
+      > term (exp): starting term
+      > depth (int): recursion depth
+      > n-triples? (bool): output as N-Triples if #t
+      < return (list|string): result triples or N-Triples string"
       (let ((select ,ontology-select)
             (n-triples ,ontology-n-triples)
             (seen (hash-table)))
