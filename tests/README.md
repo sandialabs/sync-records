@@ -3,14 +3,29 @@
 ## Setup
 
 First, build or otherwise obtain a version of the [journal SDK](https://github.com/sandialabs/sync-journal).
-Make a note of where the executable is on your filepath (e.g., `./target/debug/journal-sdk`)
-Next, make sure that a [cryptography service](https://github.com/sandialabs/sync-services) is running at the default ports (8887).
+There are two options for this:
+
+### Binary
+
+ Build the binary yourself using the instructions on [journal SDK](https://github.com/sandialabs/sync-journal). If successful, make note of the path to binary (e.g., `./target/debug/journal-sdk`)
+
+### Docker
+
+Use the prebuilt Docker container
+
+`$ docker pull ghcr.io/sandialabs/sync-journal/journal-sdk`
 
 ## Run
 
-You can now run the test by executing the following commands.
+You can now run the test by providing `test.sh` by passing in access to the SDK.
+
+### Binary
 
 `$ ./test.sh <path/to/journal-sdk>`
+
+### Docker
+
+`$ ./test.sh "docker run ghcr.io/sandialabs/sync-journal/journal-sdk"`
 
 ## Develop
 
