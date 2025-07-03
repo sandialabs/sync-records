@@ -24,14 +24,14 @@ These Scheme modules are intended to be loaded into a running Synchronic Web Jou
 2. **Load record modules**  
    You can load the provided Scheme files into the journal using the web interface or by passing them as arguments to the SDK, e.g.:
    ```
-   ./journal-sdk -b "($( cat path/to/record.scm ))"
+   ./journal-sdk -b "($( cat record.scm ) \"my-password\" $( cat control.scm ) ($(cat ledger.scm ) 1024 #f))" -s "(*step* \"my-password\")"
    ```
 
 3. **Invoke record/ledger operations**  
    Use the API or web interface to call functions defined in these modules, such as:
    ```
-   (ledger-set! (*state* documents arxiv the-synchronic-web) "0x116...")
-   (ledger-get (*state* documents arxiv the-synchronic-web))
+   (ledger-set! (*state* my data path) 42)
+   (ledger-get (*state* my data path))
    ```
 
 ## Testing
