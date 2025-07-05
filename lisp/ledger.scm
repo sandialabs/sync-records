@@ -1,9 +1,9 @@
-(lambda (blocking? window)
+(macro (secret blocking? window)
   "> blocking? (bool): if #t, then all network connections block until success or timeout
   > window (uint): number of indices (steps) to keep old state data or #f if keep forever
   < return (fnc): configured ledger setup function"
 
-  `(lambda (record secret) 
+  `(lambda (record)
      "Extend the record interface to include ledger functionality. The
      ledger extension provides logic for version-controlling stateful.
      Optionally, ledgers be configured to delete older states while
@@ -34,7 +34,7 @@
        `(lambda (name)
           (sync-call 
            `(*record*
-             ,,secret
+             ,,,secret
              (lambda (record)
                (let* ((config (cadr ((record 'get) '(ledger meta peers ,name))))
                       (messenger (eval (cadr (assoc 'messenger config))))
@@ -71,7 +71,7 @@
             (if (null? names) 'done
                 (begin (,call-peer (car names))
                        (loop (cdr names)))))
-          (sync-call '(*record* ,secret ,call-step) #t)))
+          (sync-call '(*record* ,,secret ,call-step) #t)))
 
      (define ledger-config-local
        '(lambda (record)
@@ -324,7 +324,7 @@
               ((peers) (lambda args (apply ,ledger-peers (cons record args))))
               (else (error 'missing-function "Function not found"))))))
 
-     (let* ((key-pair (crypto-generate (expression->byte-vector secret)))
+     (let* ((key-pair (crypto-generate (expression->byte-vector ,secret)))
             (public-key (car key-pair))
             (secret-key (cdr key-pair)))
        ((record 'set!) '(ledger meta config)

@@ -728,7 +728,7 @@
     (let loop ((scripts scripts))
       (if (null? scripts)
           (set! *sync-state* (sync-cons transition-bytes state))
-          (begin ((eval (car scripts)) record secret)
+          (begin ((eval (car scripts)) record)
                  (loop (cdr scripts))))))
 
   "Installed record interface")

@@ -1,4 +1,4 @@
-(lambda (record secret)
+(lambda (record)
 
   (define ontology-hash
     '(lambda (s p o)
@@ -246,4 +246,6 @@
   ((record 'set!) '(control local ontology-insert-batch!) ontology-insert-batch!)
   ((record 'set!) '(control local ontology-remove-batch!) ontology-remove-batch!)
   ((record 'set!) '(control local ontology-dfs) ontology-dfs)
-  ((record 'set!) '(record library ontology) ontology-library))
+  ((record 'set!) '(record library ontology) ontology-library)
+  
+  "Installed ontology")
