@@ -270,7 +270,7 @@
              (cond ((and (byte-vector? val-1) (byte-vector? val-2))
                     (equal? val-1 val-2))
                    ((and (sync-node? val-1) (sync-node? val-2))
-                    (sync-equivalent? val-1 val-2))
+                    (equal? (sync-digest val-1) (sync-digest val-2)))
                    (else #f)))))
 
        (define (record-serialize path)
@@ -409,7 +409,7 @@
          < return (bool): boolean indicating success of the operation"
          (let ((source (map key->bytes source)) (path (map key->bytes path)))
            (let ((node-1 (r-read source)) (node-2 (r-read path)))
-             (if (or (sync-null? node-1) (not (sync-equivalent? node-1 node-2))) #f
+             (if (or (sync-null? node-1) (not (equal? (sync-digest node-1) (sync-digest node-2)))) #f
                  (r-write! path (let loop-1 ((n-1 node-1) (n-2 node-2))
                                   (cond ((byte-vector? n-1) n-1)
                                         ((sync-null? n-1) n-2)
