@@ -45,7 +45,7 @@
              (ledger-1 *step*)
              (ledger-2 *step*)
              (ledger-1 (ledger-index))
-             (ledger-1 (ledger-get (*peers* ledger-2 *state* a b)) '(directory (c c** c*) #f))
+             (ledger-1 (ledger-get (*peers* ledger-2 *state* a b)) '(directory (c c** c*) #t))
              (ledger-1 (ledger-get (*peers* ledger-2 *state* a b c) 6) '(object 44))
              (ledger-1 (ledger-get (*peers* ledger-2 *state* a b c)) '(object 44))
              (ledger-2 (ledger-peer! ledger-3 ,(make-messenger 'ledger-3)) #t)

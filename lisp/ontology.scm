@@ -38,9 +38,9 @@
                ((record 'set!) '(control scratch triples) (cadr result))))
          (let ((root-get (lambda ()
                            (let ((result ((record 'get) '(control scratch triples))))
-                             (if (eq? (car result) 'nothing) #f
+                             (if (eq? (car result) 'nothing) (sync-null)
                                  (sync-cdr (cadr result))))))
-               (root-set! (lambda () (error 'set-error "Read-only record"))))
+               (root-set! (lambda () (error 'set-error "Read-only record") #f)))
            (let ((subrecord (record-init root-get root-set!)))
              (let loop ((in (cadr ((subrecord 'get) '()))) (out '()))
                (if (null? in)
@@ -60,10 +60,10 @@
            (let ((record-init (eval (cadr ((record 'get) '(record library record)))))
                  (root-get (lambda ()
                              (let ((result ((ledger 'get) path)))
-                               (if (eq? (car result) 'nothing) #f
+                               (if (eq? (car result) 'nothing) (sync-null)
                                    (sync-cdr (cadr result))))))
                  (root-set! (lambda (value)
-                              ((ledger 'set!) path (sync-cons type (if value value (sync-null)))))))
+                              ((ledger 'set!) path (sync-cons type value)))))
              (let ((subrecord (record-init root-get root-set!)))
                ((subrecord 'set!) `(,(,ontology-hash s p o)) value)
                ))))))
@@ -226,7 +226,6 @@
                                                            (recurse (cadar in) (- depth 1))
                                                            (recurse (caddar in) (- depth 1))
                                                            out)))))))))))
-          (display (n-triples output)) (newline)
           (if n-triples? (n-triples output) output)))))
 
   (define ontology-library
