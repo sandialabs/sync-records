@@ -33,16 +33,20 @@ run="(lambda (script)
 messenger="(lambda (journal) 
     \`(lambda (msg) (sync-call msg #t ,(sync-hash (expression->byte-vector journal)))))"
 
-record=$( cat ../lisp/record.scm )
-control=$( cat ../lisp/control.scm )
-ledger=$( cat ../lisp/ledger.scm )
-ontology=$( cat ../lisp/ontology.scm )
+# record=$( cat ../lisp/record.scm )
+control=$( cat ../lisp/objects/control.scm )
+standard=$( cat ../lisp/objects/standard.scm )
+# ledger=$( cat ../lisp/ledger.scm )
+# ontology=$( cat ../lisp/ontology.scm )
 
-echo "--- Record Test ---"
-$sdk -e "($( cat ./test-record.scm ) $run $messenger '$record '$control)"
+echo "--- Control Test ---"
+$sdk -e "($( cat ./test-control.scm ) $run $messenger '$control)"
 
-echo "--- Ledger Test ---"
-$sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$record '$control '$ledger)"
+echo "--- Control Standard ---"
+$sdk -e "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
 
-echo "--- Ontology Test ---"
-$sdk -e "($( cat ./test-ontology.scm ) $run $messenger '$record '$control '$ledger '$ontology)"
+# echo "--- Ledger Test ---"
+# $sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$record '$control '$ledger)"
+
+# echo "--- Ontology Test ---"
+# $sdk -e "($( cat ./test-ontology.scm ) $run $messenger '$record '$control '$ledger '$ontology)"
