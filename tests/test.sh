@@ -36,14 +36,20 @@ messenger="(lambda (journal)
 # record=$( cat ../lisp/record.scm )
 control=$( cat ../lisp/objects/control.scm )
 standard=$( cat ../lisp/objects/standard.scm )
+# stream_chain=$( cat ../lisp/objects/stream-chain.scm )
+linear_chain=$( cat ../lisp/objects/linear-chain.scm )
+log_chain=$( cat ../lisp/objects/log-chain.scm )
 # ledger=$( cat ../lisp/ledger.scm )
 # ontology=$( cat ../lisp/ontology.scm )
 
 echo "--- Control Test ---"
 $sdk -e "($( cat ./test-control.scm ) $run $messenger '$control)"
 
-echo "--- Control Standard ---"
+echo "--- Standards Test  ---"
 $sdk -e "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
+
+echo "--- Chain Test ---"
+$sdk -e "($( cat ./test-chain.scm ) $run $messenger '$control '$standard '$linear_chain '$log_chain)"
 
 # echo "--- Ledger Test ---"
 # $sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$record '$control '$ledger)"
