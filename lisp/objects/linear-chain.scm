@@ -5,8 +5,8 @@
 
        (define (*init* self)
          (let ((size-node (expression->byte-vector 0))
-               (chain-node (sync-cons (sync-null) (sync-null))))
-           (set! (self '(1)) (sync-cons size-node chain-node)))))
+               (chain-node (sync-null)))
+           (set! (self '(1)) (sync-cons size-node chain-node))))
 
        (define (get self index)
          (let ((index ((self '~adjust) index)))

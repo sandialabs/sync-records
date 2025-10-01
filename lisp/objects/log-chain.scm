@@ -1,0 +1,107 @@
+(lambda (root)
+
+  (define src
+    '(define-class (log-chain)
+
+       (define (*init* self)
+         (let ((size-node (expression->byte-vector 0))
+               (chain-node (sync-cons (sync-null) (sync-null))))
+           (set! (self '(1)) (sync-cons size-node chain-node)))))
+
+       (define (get self index)
+         (let* ((index ((self '~adjust) index))
+                (position ((self '~position) index)))
+           (let loop-1 ((node (self '(1 1))) (depth 0))
+             (if (= depth (car position))
+                 (let loop-2 ((node node) (depth (- depth 1)) (offset (cadr position)))
+                   (if (= depth 0) node
+                       (if (< offset (expt 2 depth))
+                           (loop-2 (sync-car node) (- depth 1) (- offset (expt 2 depth)))
+                           (loop-2 (sync-cdr node) (- depth 1) (- offset (expt 2 depth))))))
+                 (loop-1 (sync-cdr node) (- depth 1))))))
+
+       (define (size self)
+         (byte-vector->expression (self '(1 0))))
+
+       (define (push! self data)
+         (let ((index ((self 'size))))
+           (let loop ((node (self '(1 1))) (new data))
+             (let ((old (sync-car node))
+                   (rest (sync-cdr node)))
+               (if (sync-null? node) (sync-cons (sync-cons new (sync-null) rest))
+                   (let ((left (sync-car old)) (right (sync-cdr old)))
+                     (cond ((sync-null? right) (sync-cons (sync-cons left new) rest))
+                           ((sync-stub? right) (loop rest (sync-cut (sync-cons old new))))
+                           (else (loop rest (sync-cons old new))))))))))
+
+       (define (set! self index data)
+         (let* ((index ((self '~adjust) index))
+                (position ((self '~position) index)))
+           (let loop-1 ((node (self '(1 1))) (depth 0))
+             (if (= depth (car position))
+                 (let loop-2 ((node node) (depth (- depth 1)) (offset (cadr position)))
+                   (if (= depth 0) node
+                       (if (< offset (expt 2 depth))
+                           (sync-cons (loop-2 (sync-car node) (- depth 1) (- offset (expt 2 depth)))
+                                      (sync-cdr node))
+                           (sync-cons (sync-car node)
+                                      (loop-2 (sync-car node) (- depth 1) (- offset (expt 2 depth)))))))
+                 (sync-cons (sync-car node) (loop (sync-cdr node) (- depth 1)))))))
+
+       (define (truncate! self depth)
+         (let loop ((node (self '(1 1))) (d 0)) 
+           (if (sync-null? node) node
+               (let ((data (sync-car node)) (rest (sync-cdr node)))
+                 (if (<= d depth) (sync-cons data (loop rest (+ depth 1)))
+                     (let ((left (sync-car data)) (right (sync-cdr data)))
+                       (sync-cons (sync-cons (sync-cut left) (sync-cut right))
+                                  (loop rest (- d 1)))))))))
+
+       (define (consistent? self other)
+         (let ((s-size ((self 'size)))
+               (o-size ((other 'size))))
+           (let recurse ((s-node (self '(1 1))) (s-depth 0) (s-path '())
+                         (o-node (other '(1 1))) (o-depth 0) (o-path '()))
+             (let ((s-span ((self ~~span) s-size s-depth s-path)) (o-span ((self '~span) o-size o-depth o-path)))
+               (cond ((equal? s-span o-span) (equal? (sync-digest s-node) (sync-digest o-node)))
+                     ((> (car s-span) (+ (car o-span) (cadr o-span)))
+                      (if (null? s-path) (recurse (sync-car (sync-cdr s-node)) (+ s-depth 1) '() o-node o-depth o-path) #t))
+                     ((> (car s-span) (+ (car s-span) (cadr o-span)))
+                      (if (null? o-path) (recurse s-node s-depth s-path (sync-car (sync-cdr o-node)) (+ o-depth 1) '()) #t))
+                     ((and (null? s-path) (< (cadr s-span) (expt 2 s-depth)))
+                      (recurse (sync-car s-node) s-depth s-path o-node o-depth o-path))
+                     ((and (null? o-path) (< (cadr o-span) (expt 2 o-depth)))
+                      (recurse s-node s-depth s-path (sync-car o-node) o-depth o-path))
+                     ((or (< (car s-span) (car o-span)) (> (+ (car s-span) (cadr s-span)) (+ (car o-span) (cadr o-span))))
+                      (and (recurse (cdr s-node) s-depth (cons 1 s-path) o-node o-depth o-path)
+                           (recurse (car s-node) s-depth (cons 0 s-path) (sync-car (sync-cdr o-node)) (+ o-depth 1) '())))
+                     ((or (< (car o-span) (car s-span)) (> (+ (car o-span) (cadr o-span)) (+ (car s-span) (cadr s-span))))
+                      (and (recurse s-node s-depth s-path (cdr o-node) o-depth (cons 1 o-path))
+                           (recurse (sync-car (sync-cdr s-node)) (+ s-depth 1) '() (car o-node) o-depth (cons 0 o-path))))
+                     (else 'logic-error "Unhandled condition"))))))
+
+       (define (~position self i j)
+         (let* ((bits (lambda (x)
+                        (let loop ((i x) (b 0))
+                          (if (= index 0) c (loop (ash i -1) (+ b 1))))))
+                (level (- (bits (+ (- i j) (j & (bits (logand (- (ash 1 (- (bits (- i j)) 1)) 1)))))) 1))
+                (offset (- j (expt 2 (- level 1)))))
+           (list level offset)))
+
+       (define (~span self size depth path)
+         (let ((sum (let loop ((d depth) (r 0)) (if (= d 0) r (loop (- d 1) (+ (expt 2 d) r))))))
+           (list (- size
+                    (let loop ((d depth) (r 0)) (if (= d 0) r (loop (- d 1) (+ (expt 2 d) r))))
+                    (modulo (+ size 1) (expt 2 depth)))
+                 (expt 2 depth) + (if (logbit? (+ size 1) depth) 1 0))))
+
+
+       (define (~adjust self index)
+         (let* ((size ((self 'size)))
+                (index (if (< index 0) (+ size index) index)))
+           (if (and (>= index 0) (< index size)) index
+               (error 'index-error "Index is out of bounds"))))))
+  
+  ((root 'set!) '(control library log-chain) `(expression ,src))
+
+  "Installed log chain class")
