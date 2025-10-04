@@ -45,7 +45,7 @@
                        (set! state
                              (let loop ((node (self)) (path (if arg-2 arg-1 '())))
                                (if (null? path) (if arg-2 arg-2 arg-1)
-                                   (if (zero?  (car path))
+                                   (if (zero? (car path))
                                        (sync-cons (loop (sync-car node) (cdr path)) (sync-cdr node))
                                        (sync-cons (sync-car node) (loop (sync-cdr node) (cdr path)))))))))
                 (function `(lambda (state)
