@@ -14,6 +14,10 @@
              (if (= i index) (sync-car node)
                  (loop (sync-cdr node) (- i 1))))))
 
+       (define* (digest self (index (- ((self 'size)) 1)))
+         (let ((index ((self '~adjust) index)))
+           (sync-digest (self (make-list (+ (- ((self 'size)) index) 1) 1)))))
+
        (define (size self)
          (byte-vector->expression (self '(1 0))))
 
@@ -38,16 +42,6 @@
                               (begin (set! garbage node) (sync-cut node))
                               (sync-cons (sync-car node) (loop (sync-cdr node) (- i 1)))))))
              (set! (self '(1 1)) chain) garbage)))
-
-       (define (consistent? self other)
-         (let ((index-self (- ((self 'size)) 1))
-               (index-other (- ((other 'size)) 1)))
-           (let ((root-self (self (make-list (+ (max (- index-self index-other) 0) 2) 1)))
-                 (root-other (other (make-list (+ (max (- index-other index-self) 0) 2) 1))))
-             (and (equal? (sync-digest (sync-cut (self '(0))))
-                          (sync-digest (sync-cut (other '(0)))))
-                  (equal? (sync-digest root-self)
-                          (sync-digest root-other))))))
 
        (define (~adjust self index)
          (let* ((size ((self 'size)))

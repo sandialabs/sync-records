@@ -31,7 +31,7 @@
                                      "Description: " (if (string? (caddr class)) (caddr class) "") "\n"
                                      "Functions: " api "\n"
                                      "-------------------------"))
-                (err '(error 'function-error "Function not recognized"))
+                (err '(error 'function-error (append "Function not recognized: " (symbol->string *function*))))
                 (common `(((*name*) ,name) ((*api*) '(*name* *api* *class* ,@(map car methods))) ((*class*) ,class)))
                 (prep (lambda (x) `((,(car x)) (lambda args (apply ,(cadr x) (cons self args))))))
                 (get '(lambda (path)
@@ -47,7 +47,7 @@
                                (if (null? path) (if arg-2 arg-2 arg-1)
                                    (if (zero? (car path))
                                        (sync-cons (loop (sync-car node) (cdr path)) (sync-cdr node))
-                                       (sync-cons (sync-car node) (loop (sync-cdr node) (cdr path)))))))))
+                                       (sync-cons (sync-car node) (loop (sync-cdr node) (cdr path))))))) #t))
                 (function `(lambda (state)
                              (define* (self arg) ,description
                                (set!(setter self) ,set)
