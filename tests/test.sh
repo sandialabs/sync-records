@@ -33,12 +33,11 @@ run="(lambda (script)
 messenger="(lambda (journal) 
     \`(lambda (msg) (sync-call msg #t ,(sync-hash (expression->byte-vector journal)))))"
 
-# record=$( cat ../lisp/record.scm )
 control=$( cat ../lisp/objects/control.scm )
 standard=$( cat ../lisp/objects/standard.scm )
-# stream_chain=$( cat ../lisp/objects/stream-chain.scm )
 linear_chain=$( cat ../lisp/objects/linear-chain.scm )
 log_chain=$( cat ../lisp/objects/log-chain.scm )
+record=$( cat ../lisp/objects/record.scm )
 # ledger=$( cat ../lisp/ledger.scm )
 # ontology=$( cat ../lisp/ontology.scm )
 
@@ -50,6 +49,9 @@ $sdk -e "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
 
 echo "--- Chain Test ---"
 $sdk -e "($( cat ./test-chain.scm ) $run $messenger '$control '$standard '$linear_chain '$log_chain)"
+
+echo "--- Record Test ---"
+$sdk -e "($( cat ./test-record.scm ) $run $messenger '$control '$standard '$record)"
 
 # echo "--- Ledger Test ---"
 # $sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$record '$control '$ledger)"
