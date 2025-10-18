@@ -211,8 +211,8 @@
                        ((sync-stub? obj) '(unknown))
                        (else (let ((all ((self 'dir-all) obj)))
                                `(directory ,(map (self 'bytes->key) (car all)) ,(cadr all)))))
-                 (cond ((procedure? obj) `(object ,(obj)))
-                       (else `(expression ,obj)))))))
+                 (cond ((procedure? obj) `(content ,(obj)))
+                       (else `(content ,obj)))))))
 
        (define (equal? self source path)
          "Indicate whether two paths that contain identical data
@@ -390,9 +390,6 @@
                                                                      (v-2 ((self 'dir-get) n-2 k))
                                                                      (v-3 (loop-1 v-1 v-2)))
                                                                 (loop-2 ((self 'dir-set) n-3 k v-3)
-                                                                        (cdr keys))))))))))))))
-       ))
+                                                                        (cdr keys))))))))))))))))
 
-  ((root 'set!) '(control library record) `(expression ,src))
-
-  "Installed record class")
+  ((root 'set!) '(control library record) `(content ,src)))

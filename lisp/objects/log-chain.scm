@@ -42,7 +42,7 @@
                                     (target (loop (sync-cdr node) (+ depth-current 1) (+ depth-target 1))))
                         (let ((depth-start ((self '~domain) start (+ index 1)))
                               (depth-end ((self '~domain) (- end 1) (+ index 1))))
-                          (cond ((not depth-start) target)
+                          (cond ((not depth-start) (sync-digest target))
                                 ((equal? depth-start depth-end) (sync-cons node target))
                                 (else (let ((mid (/ (+ start end)  2)))
                                         (recurse (sync-cdr node) mid end
@@ -107,6 +107,4 @@
            (if (and (>= index 0) (< index size)) index
                (error 'index-error "Index is out of bounds"))))))
   
-  ((root 'set!) '(control library log-chain) `(expression ,src))
-
-  "Installed log chain class")
+  ((root 'set!) '(control library log-chain) `(content ,src)))

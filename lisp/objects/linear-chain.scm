@@ -49,6 +49,4 @@
            (if (and (>= index 0) (< index size)) index
                (error 'index-error "Index is out of bounds"))))))
 
-  ((root 'set!) '(control library linear-chain) `(expression ,src))
-
-  "Installed linear chain class")
+  ((root 'set!) '(control library linear-chain) `(content ,src)))

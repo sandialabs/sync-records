@@ -122,6 +122,4 @@
                              (loop (cdr body)))))))
       ((eval function) #f class)))
 
-  ((root 'set!) '(control library standard) `(object ,((self-make src))))
-
-  "Installed standard library")
+  ((root 'set!) '(control library standard) `(content ,((self-make src)))))
