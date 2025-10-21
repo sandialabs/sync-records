@@ -37,6 +37,7 @@ control=$( cat ../lisp/objects/control.scm )
 standard=$( cat ../lisp/objects/standard.scm )
 linear_chain=$( cat ../lisp/objects/linear-chain.scm )
 log_chain=$( cat ../lisp/objects/log-chain.scm )
+history_chain=$( cat ../lisp/objects/history-chain.scm )
 record=$( cat ../lisp/objects/record.scm )
 # ledger=$( cat ../lisp/ledger.scm )
 # ontology=$( cat ../lisp/ontology.scm )
@@ -48,7 +49,7 @@ echo "--- Standards Test  ---"
 $sdk -e "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
 
 echo "--- Chain Test ---"
-$sdk -e "($( cat ./test-chain.scm ) $run $messenger '$control '$standard '$linear_chain '$log_chain)"
+$sdk -e "($( cat ./test-chain.scm ) $run $messenger '$control '$standard '$linear_chain '$log_chain '$history_chain)"
 
 echo "--- Record Test ---"
 $sdk -e "($( cat ./test-record.scm ) $run $messenger '$control '$standard '$record)"

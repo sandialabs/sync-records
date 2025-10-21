@@ -1,4 +1,4 @@
-(lambda (run-test make-messenger control-src standard-src linear-chain-src log-chain-src)
+(lambda (run-test make-messenger control-src standard-src linear-chain-src log-chain-src history-chain-src)
   (let* ((pass (lambda (x) (append "pass-" (symbol->string x))))
          (init (lambda (x) `(,x (,control-src ,(pass x)) "Installed control module")))
          (install (lambda (x) `(,(car x) (*call* ,(pass (car x)) ,(cadr x)) #t)))
@@ -51,10 +51,9 @@
     (run-test
      (append
       (map init '(journal))
-      (map install `((journal ,standard-src "Installed standard library")
-                     (journal ,linear-chain-src "Installed linear chain class")
-                     (journal ,log-chain-src "Installed log chain class")
-                     ))
+      (map install `((journal ,standard-src) (journal ,linear-chain-src)
+                     (journal ,log-chain-src) (journal ,history-chain-src)))
       (queries 'linear-chain)
       (queries 'log-chain)
+      (queries 'history-chain)
       ))))
