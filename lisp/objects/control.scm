@@ -152,8 +152,7 @@
                     ((0) `(content ,(subvector node 1)))
                     ((1) `(content ,(byte-vector->expression (subvector node 1))))))
                  ((sync-null? node) '(nothing))
-                 ((equal? (sync-car node) struct-tag)
-                  `(content ,(sync-cdr node)))
+                 ((equal? (sync-car node) struct-tag) `(content ,(sync-cdr node)))
                  (else `(directory ,(map byte-vector->expression (dir-all node)))))))
 
        (define (root-set! path value)
@@ -229,13 +228,13 @@
                (let ((ret (sync-call `(*call* ,secret
                                               (lambda (root)
                                                 (let* ((path '(control step ,(car names)))
-                                                       (expr ((root 'get) path)))
+                                                       (expr (cadr ((root 'get) path))))
                                                   ((eval expr) root)))) #t)))
                  (loop (cdr names) (cons `(,(car names) ,ret) rets))))))))
 
   (define query
     '(lambda (root query)
-       (let ((function ((root 'get) `(control local ,(caaddr query)))))
+       (let ((function (cadr ((root 'get) `(control local ,(caaddr query))))))
          (if (eq? (car function) 'nothing)
              (error 'unknown-function "Function not found")
              (apply (eval function) (cons root (cdaddr query)))))))

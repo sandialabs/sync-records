@@ -286,16 +286,19 @@
          > path (list sym|vec): path from the record root to the data
          > value (exp|sync-pair): data to be stored at the path
          < return (bool): boolean indicating success of the operation"
-         (if (eq? value #f)
-             (set! (self '(1))
-                   (let ((path (map (self 'key->bytes) path)))
-                     (let loop ((node (self '(1))) (path path))
-                       (if (null? path) ((self 'dir-new))
-                           (let ((child (loop ((self 'dir-get) node (car path)) (cdr path))))
-                             (if (equal? child ((self 'dir-new))) ((self 'dir-delete) node (car path))
-                                 ((self 'dir-set) node (car path) child)))))))
-             (let ((value (if (sync-node? value) (lambda () value) value)))
-               ((self 'r-write!) (map (self 'key->bytes) path) ((self 'obj->node) value)))))
+         (case (car value)
+           ((nothing)
+            (set! (self '(1))
+                  (let ((path (map (self 'key->bytes) path)))
+                    (let loop ((node (self '(1))) (path path))
+                      (if (null? path) ((self 'dir-new))
+                          (let ((child (loop ((self 'dir-get) node (car path)) (cdr path))))
+                            (if (equal? child ((self 'dir-new))) ((self 'dir-delete) node (car path))
+                                ((self 'dir-set) node (car path) child))))))))
+           ((content)
+            (let ((value (if (sync-node? value) (lambda () value) value)))
+              ((self 'r-write!) (map (self 'key->bytes) path) ((self 'obj->node) (cadr value)))))
+           (else (error 'invalid-content "Content type not recognized"))))
 
        (define (copy! self source path)
          "Copy data from the source path to the target path.

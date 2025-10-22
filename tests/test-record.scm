@@ -38,16 +38,16 @@
       (map instantiate `((journal record-1 (control library record))
                          (journal record-2 (control library record))))
       (map query
-           `((journal (record-1) ((record-1 'set!) '(a b) 2) #t)
-             (journal (record-1) ((record-1 'set!) '(a c d) 4) #t)
-             (journal (record-1) ((record-1 'set!) '(a c* d) 4) #t)
+           `((journal (record-1) ((record-1 'set!) '(a b) '(content 2)) #t)
+             (journal (record-1) ((record-1 'set!) '(a c d) '(content 4)) #t)
+             (journal (record-1) ((record-1 'set!) '(a c* d) '(content 4)) #t)
              (journal (record-1) ((record-1 'get) '(a c d)) '(content 4))
-             (journal (record-1) ((record-1 'set!) '(a e f) 9) #t)
-             (journal (record-1) ((record-1 'set!) '(a e g) 10) #t)
+             (journal (record-1) ((record-1 'set!) '(a e f) '(content 9)) #t)
+             (journal (record-1) ((record-1 'set!) '(a e g) '(content 10)) #t)
 
              ;; delete
-             (journal (record-1) ((record-1 'set!) '(a e f) #f) #t)
-             (journal (record-1) ((record-1 'set!) '(a e) #f) #t)
+             (journal (record-1) ((record-1 'set!) '(a e f) '(nothing)) #t)
+             (journal (record-1) ((record-1 'set!) '(a e) '(nothing)) #t)
 
              ;; getting
              (journal (record-1) ((record-1 'get) '(a)) '(directory (c c* b) #t))
@@ -76,10 +76,10 @@
              (journal (record-1) ((record-1 'equal?) '(a*) '(a)) #t)
 
              ;; pruning
-             (journal (record-1) ((record-1 'set!) '(b a c d) 4) #t)
-             (journal (record-1) ((record-1 'set!) '(b d d) 2) #t)
-             (journal (record-1) ((record-1 'set!) '(b d e) 5) #t)
-             (journal (record-1) ((record-1 'set!) '(b n c d) 1) #t)
+             (journal (record-1) ((record-1 'set!) '(b a c d) '(content 4)) #t)
+             (journal (record-1) ((record-1 'set!) '(b d d) '(content 2)) #t)
+             (journal (record-1) ((record-1 'set!) '(b d e) '(content 5)) #t)
+             (journal (record-1) ((record-1 'set!) '(b n c d) '(content 1)) #t)
              (journal (record-1) ((record-1 'copy!) '(b) '(b*)) #t)
              (journal (record-1) ((record-1 'prune!) '(b) '(d d) #t) #t)
              (journal (record-1) ((record-1 'prune!) '(b) '(d e)) #t)
@@ -94,6 +94,4 @@
              ;; merging
              (journal (record-1) ((record-1 'merge!) '(b) '(b*)) #t)
              (journal (record-1) ((record-1 'equivalent?) '(b) '(b*)) #t)
-             (journal (record-1) ((record-1 'get) '(b* d d)) '(content 2))
-             ))
-      ))))
+             (journal (record-1) ((record-1 'get) '(b* d d)) '(content 2))))))))
