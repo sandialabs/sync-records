@@ -36,7 +36,8 @@
       (map install `((journal ,standard-src "Installed standard library")
                      (journal ,record-src "Installed record class")))
       (map instantiate `((journal record-1 (control library record))
-                         (journal record-2 (control library record))))
+                         (journal record-2 (control library record))
+                         (journal record-3 (control library record))))
       (map query
            `((journal (record-1) ((record-1 'set!) '(a b) '(content 2)) #t)
              (journal (record-1) ((record-1 'set!) '(a c d) '(content 4)) #t)
@@ -69,12 +70,6 @@
              (journal (record-1) ((record-1 'get) '(a b)) '(content 2))
              (journal (record-1) ((record-1 'get) '(a)) '(directory (b) #f))
 
-             ;; serialization
-             (journal (record-1) ((record-1 'deserialize!) '(a*) ((record-1 'serialize) '(a))) #t)
-             (journal (record-1) ((record-1 'equal?) '(a* b) '(a b)) #t)
-             (journal (record-1) ((record-1 'deserialize!) '(a*) ((record-1 'serialize) '(a))) #t)
-             (journal (record-1) ((record-1 'equal?) '(a*) '(a)) #t)
-
              ;; pruning
              (journal (record-1) ((record-1 'set!) '(b a c d) '(content 4)) #t)
              (journal (record-1) ((record-1 'set!) '(b d d) '(content 2)) #t)
@@ -91,7 +86,16 @@
              (journal (record-1) ((record-1 'equal?) '(b) '(b*)) #f)
              (journal (record-1) ((record-1 'equivalent?) '(b) '(b*)) #t)
 
+             ;; validity
+             (journal (record-1) ((record-1 'valid?) #t))
+
              ;; merging
-             (journal (record-1) ((record-1 'merge!) '(b) '(b*)) #t)
-             (journal (record-1) ((record-1 'equivalent?) '(b) '(b*)) #t)
-             (journal (record-1) ((record-1 'get) '(b* d d)) '(content 2))))))))
+             (journal (record-2) ((record-2 'set!) '(a b) '(content 2)) #t)
+             (journal (record-2) ((record-2 'set!) '(a* b) '(content 4)) #t)
+             (journal (record-2) ((record-2 'prune!) '() '(a b)) #t)
+             (journal (record-3) ((record-3 'set!) '(a b) '(content 2)) #t)
+             (journal (record-3) ((record-3 'set!) '(a* b) '(content 4)) #t)
+             (journal (record-3) ((record-3 'prune!) '() '(a* b)) #t)
+             (journal (record-2 record-3) ((record-2 'merge!) record-3) #t)
+             (journal (record-2) ((record-2 'get) '(a b)) '(content 2))
+             (journal (record-2) ((record-2 'get) '(a* b)) '(content 4))))))))
