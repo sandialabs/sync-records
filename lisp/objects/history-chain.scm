@@ -46,13 +46,13 @@
          (let ((index ((self '~adjust) index)))
            (set! (self '(1 1)) ((self '~zip) (self '(1 1)) index (lambda (x) data)))))
 
-       (define* (digest self index)
+       (define* (digest self (index (- ((self 'size)) 1)))
          (let* ((size ((self 'size)))
                 (index ((self '~adjust) (if index index (- size 1))))
                 (num-bits (lambda (x) (let loop ((i x) (b 0)) (if (= i 0) b (loop (ash i -1) (+ b 1))))))
                 (chain ((self '~zip) (self '(1 1)) index :op-right (lambda (x) (sync-null)))))
            (let loop ((node chain) (depth (- (num-bits (- size 1)) (num-bits index))))
-             (if (zero? depth) (sync-digest node)
+             (if (zero? depth) (sync-digest (sync-cut node))
                  (loop (sync-car node) (- depth 1))))))
 
        (define (truncate! self index)
