@@ -15,7 +15,7 @@ Use the prebuilt Docker container
 
 `$ docker pull ghcr.io/sandialabs/sync-journal/journal-sdk`
 
-## Run
+## Run Tests
 
 You can now run the test by providing `test.sh` by passing in access to the SDK.
 
@@ -40,7 +40,7 @@ To maximize flexibility, the contents of each `*-test.scm` is actually a functio
 - `record-src` the source code for the `control.scm` function required by `record.scm`
 - `...` other test-specific arguments (e.g., more source code) required to run the test
 
-In general, `*-record.scm` functions can run arbitrary code to compute and format the desired test script.
+In general, `test-*.scm` functions can run arbitrary code to compute and format the desired test script.
 Eventually, the script that is passed into `run-test` must be a list where each item is itself a list with the following elements in order:
 
 1. `journal`: a symbol refering to the simulated journal
@@ -51,3 +51,15 @@ If the condition is a function, it must have the form `(lambda (result) ...)` to
 If the condition is an expression, it will be compared against the result to determine success or failure using the `equals?` function.
 If the condition is omitted, then the script action is assumed to succeed.
 A test passes if all of the individual script actions succeed.
+
+## Run Benchmarks
+
+You can also run the benchmarks by providing `test.sh` by passing in access to the SDK.
+
+### Binary
+
+`$ ./measure.sh <path/to/journal-sdk>`
+
+### Docker
+
+`$ ./measure.sh "docker run ghcr.io/sandialabs/sync-journal/journal-sdk"`
