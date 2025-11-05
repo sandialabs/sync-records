@@ -1,3 +1,14 @@
+;; authentication options
+;; - have some kind of configurable system within the query handler
+;; - wrap in some kind of master authentication system
+;;   - could bake into the API somehow
+;; - for every query
+;; - ask authenticator if allowed, get #t/#f
+;; - maybe all local comes with authentication?
+;; - that just sounds like wrapping it into the functionality
+;; - why not?
+;; - implies we just have one interface or ledger, basically
+
 (lambda (secret)
   (define transition-function
     '(lambda (*sync-state* query)
@@ -49,7 +60,6 @@
                  ((*eval*) (apply control-eval (cdr query)))
                  ((*call*) (apply control-call (cdr query)))
                  ((*step*) (apply control-step (cdr query)))
-                 ((*query*) (apply control-query (cdr query)))
                  ((*set-secret*) (apply control-set (append '(secret) (cdr query))))
                  ((*set-step*) (apply control-set (append '(step) (cdr query))))
                  ((*set-query*) (apply control-set (append '(query) (cdr query))))
@@ -234,10 +244,10 @@
 
   (define query
     '(lambda (root query)
-       (let ((function (cadr ((root 'get) `(control local ,(caaddr query))))))
-         (if (eq? (car function) 'nothing)
+       (let ((result ((root 'get) `(control local ,(car query)))))
+         (if (eq? (car result) 'nothing)
              (error 'unknown-function "Function not found")
-             (apply (eval function) (cons root (cdaddr query)))))))
+             (apply (eval (cadr result)) (cons root (cdr query)))))))
 
   (let ((control-node (expression->byte-vector transition-function))
         (secret-node (sync-hash (expression->byte-vector secret)))

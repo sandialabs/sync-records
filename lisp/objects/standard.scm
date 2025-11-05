@@ -50,7 +50,7 @@
                                        (sync-cons (sync-car node) (loop (sync-cdr node) (cdr path))))))) #t))
                 (function `(lambda (state)
                              (define* (self arg) ,description
-                               (set!(setter self) ,set)
+                               (set! (setter self) ,set)
                                (cond ((not arg) state)
                                      ((list? arg) (,get arg))
                                      (else (with-let (sublet (rootlet) 'self self '*function* arg)
@@ -70,10 +70,26 @@
        (define (load self node)
          ((eval (byte-vector->expression (sync-car node))) node))
 
-       (define (serialize self node)
-         (let ((ls '())
-               (tb (hash-table))
-               (sym (lambda (x) (string->symbol (append "n-" x)))))
+       (define (pass self object path query)
+         (if (null? path) `(,(apply (object (car query)) (cdr query)) ,(object))
+             (let* ((node ((object 'get) (car path)))
+                    (child ((self 'load) load-object node))
+                    (result ((self 'pass) (cdr path) query)))
+               (if (not (eq? node (child)))
+                   ((object 'set!) (car path) `(content ,(child))))
+               `(,(car result) ,(object)))))
+
+       (define* (serialize self node query ignore) ;; --> serialization
+         (let* ((ls '())
+                (tb (hash-table))
+                (sym (lambda (x) (string->symbol (append "n-" x))))
+                (sync-cons-track (lambda (x y) (display 'cons) (newline) (sync-cons x y)))
+                (sync-car-track (lambda (x) (display 'car) (newline) (sync-car x)))
+                (sync-cdr-track (lambda (x) (display 'cdr) (newline) (sync-cdr x))))
+           (with-let (sublet (rootlet) '*query* query '*node* node
+                             'sync-cons sync-cons-track 'sync-car sync-car-track 'sync-cdr sync-cdr-track)
+                     (let ((rootlet curlet))
+                       ((eval *query*) *node*)))
            (let recurse ((node node))
              (let* ((h (if (sync-node? node) (sync-digest node) (sync-hash node)))
                     (id (sym (byte-vector->hex-string h))))
@@ -102,7 +118,7 @@
              (map (lambda (x) (compact (map shorten x))) ls))))
 
 
-       (define (deserialize self serialization)
+       (define* (deserialize self serialization query ignore) ;; --> object
          (let* ((proc (lambda (x)
                         (let ((k (car x)) (v (cadr x)))
                           (case (car v)

@@ -24,28 +24,33 @@
     (sync-call `(*call* ,password ,standard-src) #t journal)
     (sync-call `(*call* ,password ,chain-src) #t journal)
     (sync-call (instantiate 'chain path) #t journal)
-    (sync-call (query 'chain
-                      `(let loop ((index 0))
-                         (if (>= index ,start) #t
-                             (begin ((chain 'push!) (expression->byte-vector index))
-                                    (loop (+ index 1)))))) #t journal)
+    ;; (sync-call (query 'chain
+    ;;                   `(let loop ((index 0))
+    ;;                      (if (>= index ,start) #t
+    ;;                          (begin ((chain 'push!) (expression->byte-vector index))
+    ;;                                 (loop (+ index 1)))))) #t journal)
     `((push
-       ,(let loop ((index start) (result '()))
-          (if (>= index end) result
+       ,(let loop ((index 0) (result '()))
+          (if (>= index end) (reverse result)
               (let ((r (sync-call (query 'chain `((chain 'push!) (expression->byte-vector (+ ,index ,start)))) #t journal)))
-                (if (> step 0) (sync-call (query 'chain
+                (if (> step 1) (sync-call (query 'chain
                                                  `(let loop ((i 1))
                                                     (if (>= i ,step) #t
                                                         (begin ((chain 'push!) (expression->byte-vector (+ ,index i)))
                                                                (loop (+ i 1)))))) #t journal))
-                (loop (+ index step) (cons r result))))))
+                (loop (+ index step) (cons `(,index ,r) result))))))
       (get
-       ,(let loop ((index 0) (result '()))
-          (if (>= index (- end start)) (reverse result)
-              (let ((r (sync-call (query 'chain `((chain 'get) (- -1 ,index))) #t journal)))
-                (loop (+ index step) (cons r result))))))
+       ,(let loop ((index (- end 1)) (result '()))
+          (if (< index start) result
+              (let ((r (sync-call (query 'chain `((chain 'get) ,index)) #t journal)))
+                (loop (- index step) (cons `(,index ,r) result))))))
+      (set
+       ,(let loop ((index (- end 1)) (result '()))
+          (if (< index start) result
+              (let ((r (sync-call (query 'chain `((chain 'set!) ,index (expression->byte-vector (- ,index)))) #t journal)))
+                (loop (- index step) (cons `(,index ,r) result))))))
       (digest
-       ,(let loop ((index 0) (result '()))
-          (if (= index (- end start)) (reverse result)
-              (let ((r (sync-call (query 'chain `((chain 'digest) (- -1 ,index))) #t journal)))
-                (loop (+ index step) (cons r result)))))))))
+       ,(let loop ((index (- end 1)) (result '()))
+          (if (< index start) result
+              (let ((r (sync-call (query 'chain `((chain 'digest) ,index)) #t journal)))
+                (loop (- index step) (cons `(,index ,r) result)))))))))

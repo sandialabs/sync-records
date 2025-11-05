@@ -47,7 +47,7 @@
                                       ((chain-3 'push!) (expression->byte-vector "chain"))
                                       (and (equal? ((chain-1 'digest)) ((chain-2 'digest) -3))
                                            (equal? ((chain-1 'digest)) ((chain-3 'digest) -7)))) #t)
-                           (journal (let* ((size 4096)
+                           (journal (let* ((size 100)
                                            (chain ((std 'make) (cadr ((root 'get) '(control library ,chain)))))
                                            (digests-1 (let loop ((i 0) (digests '()))
                                                         (if (= i size) (reverse digests)

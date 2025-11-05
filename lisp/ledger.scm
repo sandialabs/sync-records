@@ -239,6 +239,10 @@
           > path (list sym|vec): path to the source location
           > target (list sym|vec): path to the target location
           < return (bool): boolean indicating success of the operation"
+          (if (or (null? path) (not (eq? (car path) '*state*)))
+              (error 'path-error "first path segment must be *state*")
+              ((record 'set!) (append '(ledger stage) path) value))))
+
          (if (or (null? target) (not (eq? (car target) '*state*)))
              (error 'path-error "First segment of target path must be *state*")
              (,ledger-operate
