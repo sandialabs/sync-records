@@ -55,6 +55,10 @@
              (if (zero? depth) (sync-digest (sync-cut node))
                  (loop (sync-car node) (- depth 1))))))
 
+       (define (prune! self index)
+         (let ((index ((self '~adjust) index)))
+           (set! (self '(1 1)) ((self '~zip) (self '(1 1)) index (lambda (x) (sync-cut x))))))
+
        (define (truncate! self index)
          (let ((index ((self '~adjust) index)))
            (set! (self '(1 1)) ((self '~zip) (self '(1 1)) index :op-left (lambda (x) (sync-cut x))))))

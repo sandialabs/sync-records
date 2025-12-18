@@ -48,6 +48,13 @@
                    (if (= i index) (sync-cons data (sync-cdr node))
                        (sync-cons (sync-car node) ((self '~previous) (loop (sync-car (sync-cdr node)) (- i 1)) i)))))))
 
+       (define (prune! self index)
+         (let ((size ((self 'size))) (index ((self '~adjust) index)))
+           (set! (self '(1 1))
+                 (let loop ((node (self '(1 1))) (i (- size 1)))
+                   (if (= i index) (sync-cons (sync-cut (sync-car node)) (sync-cdr node))
+                       (sync-cons (sync-car node) ((self '~previous) (loop (sync-car (sync-cdr node)) (- i 1)) i)))))))
+
        (define (truncate! self index)
          (let ((size ((self 'size))) (index ((self '~adjust) index)))
            (set! (self '(1 1))

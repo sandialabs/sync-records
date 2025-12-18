@@ -51,15 +51,3 @@ If the condition is a function, it must have the form `(lambda (result) ...)` to
 If the condition is an expression, it will be compared against the result to determine success or failure using the `equals?` function.
 If the condition is omitted, then the script action is assumed to succeed.
 A test passes if all of the individual script actions succeed.
-
-## Run Benchmarks
-
-You can also run the benchmarks by providing `test.sh` by passing in access to the SDK.
-
-### Binary
-
-`$ ./measure.sh <path/to/journal-sdk>`
-
-### Docker
-
-`$ ./measure.sh "docker run ghcr.io/sandialabs/sync-journal/journal-sdk"`
