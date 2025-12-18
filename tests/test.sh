@@ -43,17 +43,17 @@ record=$( cat ../lisp/objects/record.scm )
 ledger=$( cat ../lisp/objects/ledger.scm )
 # ontology=$( cat ../lisp/ontology.scm )
 
-# echo "--- Control Test ---"
-# $sdk -e "($( cat ./test-control.scm ) $run $messenger '$control)"
+echo "--- Control Test ---"
+$sdk -e "($( cat ./test-control.scm ) $run $messenger '$control)"
 
-# echo "--- Standards Test  ---"
-# $sdk -e "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
+echo "--- Standards Test  ---"
+$sdk -e "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
 
 echo "--- Chain Test ---"
 $sdk -e "($( cat ./test-chain.scm ) $run $messenger '$control '$standard '$linear_chain '$log_chain '$history_chain '$skip_chain)"
 
-# echo "--- Record Test ---"
-# $sdk -e "($( cat ./test-record.scm ) $run $messenger '$control '$standard '$record)"
+echo "--- Record Test ---"
+$sdk -e "($( cat ./test-record.scm ) $run $messenger '$control '$standard '$record)"
 
 # echo "--- Ledger Test ---"
 # $sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$control '$standard '$log_chain '$record '$ledger)"
