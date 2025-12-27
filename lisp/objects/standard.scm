@@ -69,13 +69,13 @@
        (define (load self node)
          ((eval (byte-vector->expression (sync-car node))) node))
 
-       (define (pass self object path query)
-         (if (null? path) `(,(apply (object (car query)) (cdr query)) ,(object))
+       (define (deep-call self object path function)
+         (if (null? path) `(,(function object) ,(object))
              (let* ((node ((object 'get) (car path)))
-                    (child ((self 'load) load-object node))
-                    (result ((self 'pass) (cdr path) query)))
+                    (child ((self 'load) node))
+                    (result ((self 'deep-call) child (cdr path) function)))
                (if (not (eq? node (child)))
-                   ((object 'set!) (car path) `(content ,(child))))
+                   ((object 'set!) (car path) (child)))
                `(,(car result) ,(object)))))
 
        (define (serialize self node query)
