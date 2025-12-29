@@ -66,7 +66,7 @@
 
              ;; slicing
              (journal (record-1) ((record-1 'get) '(a)) '(directory (c c* b) #t))
-             (journal (record-1) ((record-1 'slice!) '(a) '(b)) #t)
+             (journal (record-1) ((record-1 'slice!) '(a b)) #t)
              (journal (record-1) ((record-1 'get) '(a b)) '(content 2))
              (journal (record-1) ((record-1 'get) '(a)) '(directory (b) #f))
 
@@ -76,8 +76,8 @@
              (journal (record-1) ((record-1 'set!) '(b d e) '(content 5)) #t)
              (journal (record-1) ((record-1 'set!) '(b n c d) '(content 1)) #t)
              (journal (record-1) ((record-1 'copy!) '(b) '(b*)) #t)
-             (journal (record-1) ((record-1 'prune!) '(b) '(d d) #t) #t)
-             (journal (record-1) ((record-1 'prune!) '(b) '(d e)) #t)
+             (journal (record-1) ((record-1 'prune!) '(b d d) #t) #t)
+             (journal (record-1) ((record-1 'prune!) '(b d e)) #t)
              (journal (record-1) ((record-1 'get) '(b d)) '(directory (d) #f))
              (journal (record-1) ((record-1 'get) '(b d d)) '(unknown))
              (journal (record-1) ((record-1 'get) '(b n c d)) '(content 1))
@@ -92,10 +92,11 @@
              ;; merging
              (journal (record-2) ((record-2 'set!) '(a b) '(content 2)) #t)
              (journal (record-2) ((record-2 'set!) '(a* b) '(content 4)) #t)
-             (journal (record-2) ((record-2 'prune!) '() '(a b)) #t)
+             (journal (record-2) ((record-2 'prune!) '(a b)) #t)
              (journal (record-3) ((record-3 'set!) '(a b) '(content 2)) #t)
              (journal (record-3) ((record-3 'set!) '(a* b) '(content 4)) #t)
-             (journal (record-3) ((record-3 'prune!) '() '(a* b)) #t)
+             (journal (record-3) ((record-3 'prune!) '(a* b)) #t)
              (journal (record-2 record-3) ((record-2 'merge!) record-3) #t)
              (journal (record-2) ((record-2 'get) '(a b)) '(content 2))
-             (journal (record-2) ((record-2 'get) '(a* b)) '(content 4))))))))
+             (journal (record-2) ((record-2 'get) '(a* b)) '(content 4))
+             ))))))

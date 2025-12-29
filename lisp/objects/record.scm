@@ -3,7 +3,7 @@
   (define src
     '(define-class (record)
 
-       (define (key-bits self key)
+       (define (~key-bits self key)
          (let loop-1 ((bytes (map (lambda (x) x) (sync-hash key))) (ret '()))
            (if (null? bytes) (reverse ret)
                (let* ((byte (car bytes))
@@ -13,11 +13,11 @@
                                        (loop-2 (- i 1) (cons (logand (ash byte i) 1) bits)))))))
                  (loop-1 (cdr bytes) (append (as-bits byte) ret))))))
 
-       (define (dir-new self)
+       (define (~dir-new self)
          (sync-null))
 
-       (define (dir-get self node key)
-         (let loop ((node node) (bits ((self 'key-bits) key)))
+       (define (~dir-get self node key)
+         (let loop ((node node) (bits ((self '~key-bits) key)))
            (cond ((sync-null? node) node)
                  ((sync-stub? node) node)
                  ((byte-vector? (sync-car node))
@@ -26,8 +26,8 @@
                            (loop (sync-car node) (cdr bits))
                            (loop (sync-cdr node) (cdr bits)))))))
 
-       (define (dir-set self node key value)
-         (let loop-1 ((node node) (bits ((self 'key-bits) key)) (depth 0))
+       (define (~dir-set self node key value)
+         (let loop-1 ((node node) (bits ((self '~key-bits) key)) (depth 0))
            (if (or (sync-null? node) (sync-stub? node)) (sync-cons key value)
                (let ((left (sync-car node)) (right (sync-cdr node)))
                  (if (not (byte-vector? left))
@@ -35,7 +35,7 @@
                          (sync-cons (loop-1 left (cdr bits) (+ depth 1)) right)
                          (sync-cons left (loop-1 right (cdr bits) (+ depth 1))))
                      (if (equal? left key) (sync-cons key value)
-                         (let loop-2 ((bits-new bits) (bits-old (list-tail ((self 'key-bits) left) depth)))
+                         (let loop-2 ((bits-new bits) (bits-old (list-tail ((self '~key-bits) left) depth)))
                            (cond ((and (zero? (car bits-new)) (zero? (car bits-old)))
                                   (sync-cons (loop-2 (cdr bits-new) (cdr bits-old)) (sync-null)))
                                  ((and (not (zero? (car bits-new))) (not (zero? (car bits-old))))
@@ -46,8 +46,8 @@
                                   (sync-cons node (sync-cons key value)))
                                  (else (error 'logic-error "Missing conditions"))))))))))
 
-       (define (dir-delete self node key)
-         (let loop ((node node) (bits ((self 'key-bits) key)))
+       (define (~dir-delete self node key)
+         (let loop ((node node) (bits ((self '~key-bits) key)))
            (if (or (sync-null? node) (sync-stub? node)) (sync-null)
                (let ((left (sync-car node)) (right (sync-cdr node)))
                  (if (byte-vector? left)
@@ -59,11 +59,11 @@
                              ((and (sync-null? right) (sync-pair? left) (byte-vector? (sync-car left))) left)
                              (else (sync-cons left right)))))))))
 
-       (define (dir-digest self node)
+       (define (~dir-digest self node)
          (sync-digest node))
 
-       (define (dir-slice self node key)
-         (let loop ((node node) (bits ((self 'key-bits) key)))
+       (define (~dir-slice self node key)
+         (let loop ((node node) (bits ((self '~key-bits) key)))
            (cond ((sync-null? node) node)
                  ((sync-stub? node) node)
                  ((byte-vector? (sync-car node))
@@ -75,8 +75,8 @@
                                     (if (zero? (car bits)) (if (sync-null? right) right (sync-cut right))
                                         (loop right (cdr bits)))))))))
 
-       (define (dir-prune self node key keep-key?)
-         (let loop ((node node) (bits ((self 'key-bits) key)))
+       (define (~dir-prune self node key keep-key?)
+         (let loop ((node node) (bits ((self '~key-bits) key)))
            (if (or (sync-null? node) (sync-stub? node)) (sync-null)
                (let ((left (sync-car node)) (right (sync-cdr node)))
                  (if (byte-vector? left)
@@ -90,7 +90,7 @@
                            (sync-cut node)
                            (sync-cons left right))))))))
 
-       (define (dir-merge self node-1 node-2)
+       (define (~dir-merge self node-1 node-2)
          (let recurse ((node-1 node-1) (node-2 node-2))
            (cond ((and (sync-stub? node-1) (sync-stub? node-2)) node-1)
                  ((and (not (sync-stub? node-1)) (sync-stub? node-2)) node-1)
@@ -101,7 +101,7 @@
                  ((equal? node-1 node-2) node-1)
                  (else (error 'invalid-structure "Cannot merge incompatible structure")))))
 
-       (define (dir-all self node)
+       (define (~dir-all self node)
          (let recurse ((node node))
            (cond ((sync-null? node) '(() #t))
                  ((sync-stub? node) '(() #f))
@@ -111,12 +111,12 @@
                                `(,(append (car all-l) (car all-r))
                                  ,(and (cadr all-l) (cadr all-r))))))))))
 
-       (define (dir-valid? self node)
+       (define (~dir-valid? self node)
          (let ((new (let loop ((node node) (bits '()))
                       (if (or (sync-null? node) (sync-stub? node)) node
                           (let ((left (sync-car node)) (right (sync-cdr node)))
                             (if (byte-vector? left)
-                                (let* ((bits-found ((self 'key-bits) left))
+                                (let* ((bits-found ((self '~key-bits) left))
                                        (prfx-length (- (length bits-found) (length bits)))
                                        (prfx (list-tail (reverse bits-found) prfx-length)))
                                   (if (equal? bits prfx) node (sync-null)))
@@ -126,42 +126,42 @@
 
        ;; --- helper functions ---
 
-       (define (key->bytes self key)
+       (define (~key->bytes self key)
          (cond ((sync-node? key) (error 'invalid-type "Keys cannot be sync nodes"))
                ((byte-vector? key) (append #u(0) key))
                (else (append #u(1) (expression->byte-vector key)))))
 
-       (define (bytes->key self bytes)
+       (define (~bytes->key self bytes)
          (case (bytes 0)
            ((0) (subvector bytes 1))
            ((1) (byte-vector->expression (subvector bytes 1)))
            (else (error 'invalid-type "Key type encoding not recognized"))))
 
-       (define (struct-tag self)
+       (define (~struct-tag self)
          (sync-cons (sync-null) (sync-null)))
 
-       (define (struct? self node)
-         (and (sync-pair? node) (equal? (sync-car node) (self 'struct-tag))))
+       (define (~struct? self node)
+         (and (sync-pair? node) (equal? (sync-car node) (self '~struct-tag))))
 
-       (define (r-read self path)
+       (define (~r-read self path)
          (let loop ((node (self '(1))) (path path))
            (cond ((sync-null? node) node)
                  ((sync-stub? node) node)
                  ((null? path) node)
-                 (else (loop ((self 'dir-get) node (car path)) (cdr path))))))
+                 (else (loop ((self '~dir-get) node (car path)) (cdr path))))))
 
-       (define* (r-write! self path value)
+       (define* (~r-write! self path value)
          (set! (self '(1))
                (let loop ((node (self '(1))) (path path))
                  (if (null? path) value
                      (let* ((key (car path))
-                            (node (if (sync-null? node) ((self 'dir-new)) node))
-                            (old ((self 'dir-get) node key)))
-                       ((self 'dir-set) node key (loop old (cdr path))))))))
+                            (node (if (sync-null? node) ((self '~dir-new)) node))
+                            (old ((self '~dir-get) node key)))
+                       ((self '~dir-set) node key (loop old (cdr path))))))))
 
        (define (obj->node self obj)
          (cond ((sync-node? obj) obj)
-               ((procedure? obj) (sync-cons (self 'struct-tag) (obj)))
+               ((procedure? obj) (sync-cons (self '~struct-tag) (obj)))
                ((byte-vector? obj) (append #u(0) obj)) 
                (else (append #u(1) (expression->byte-vector obj)))))
 
@@ -174,7 +174,7 @@
                ((sync-null? node) node)
                ((sync-stub? node) node)
                ((sync-pair? node)
-                (if (not (equal? (sync-car node) (self 'struct-tag))) node
+                (if (not (equal? (sync-car node) (self '~struct-tag))) node
                     (lambda () (sync-cdr node))))
                (else (error 'invalid-type "Invalid value type"))))
 
@@ -191,13 +191,13 @@
                  (i.e., none of its underlying data has been pruned)
              - 'nothing type indicates that no data is found at the path
              - 'unknown type indicates the path has been cut"
-         (let ((path (map (self 'key->bytes) path)))
-           (let ((obj ((self 'node->obj) ((self 'r-read) path))))
+         (let ((path (map (self '~key->bytes) path)))
+           (let ((obj ((self 'node->obj) ((self '~r-read) path))))
              (if (sync-node? obj)
                  (cond ((sync-null? obj) '(nothing))
                        ((sync-stub? obj) '(unknown))
-                       (else (let ((all ((self 'dir-all) obj)))
-                               `(directory ,(map (self 'bytes->key) (car all)) ,(cadr all)))))
+                       (else (let ((all ((self '~dir-all) obj)))
+                               `(directory ,(map (self '~bytes->key) (car all)) ,(cadr all)))))
                  (cond ((procedure? obj) `(content ,(obj)))
                        (else `(content ,obj)))))))
 
@@ -207,8 +207,8 @@
          > path (list sym|vec): path from the record root to source data
          > target (list sym|vec): path from the record root to target data
          < return (bool): if paths are equal then #t, otherwise #f"
-         (let ((source (map (self 'key->bytes) source)) (path (map (self 'key->bytes) path)))
-           (equal? ((self 'r-read) source) ((self 'r-read) path))))
+         (let ((source (map (self '~key->bytes) source)) (path (map (self '~key->bytes) path)))
+           (equal? ((self '~r-read) source) ((self '~r-read) path))))
 
        (define (equivalent? self source path)
          "Indicate whether two paths point to data that was formed
@@ -217,8 +217,8 @@
          > path (list sym|vec): path from the record root to source data
          > target (list sym|vec): path from the record root to target data
          < return (bool): if paths are equivalent then #t, otherwise #f"
-         (let ((source (map (self 'key->bytes) source)) (path (map (self 'key->bytes) path)))
-           (let ((val-1 ((self 'r-read) source)) (val-2 ((self 'r-read) path)))
+         (let ((source (map (self '~key->bytes) source)) (path (map (self '~key->bytes) path)))
+           (let ((val-1 ((self '~r-read) source)) (val-2 ((self '~r-read) path)))
              (cond ((and (byte-vector? val-1) (byte-vector? val-2))
                     (equal? val-1 val-2))
                    ((and (sync-node? val-1) (sync-node? val-2))
@@ -238,15 +238,15 @@
          (case (car value)
            ((nothing)
             (set! (self '(1))
-                  (let ((path (map (self 'key->bytes) path)))
+                  (let ((path (map (self '~key->bytes) path)))
                     (let loop ((node (self '(1))) (path path))
-                      (if (null? path) ((self 'dir-new))
-                          (let ((child (loop ((self 'dir-get) node (car path)) (cdr path))))
-                            (if (equal? child ((self 'dir-new))) ((self 'dir-delete) node (car path))
-                                ((self 'dir-set) node (car path) child))))))))
+                      (if (null? path) ((self '~dir-new))
+                          (let ((child (loop ((self '~dir-get) node (car path)) (cdr path))))
+                            (if (equal? child ((self '~dir-new))) ((self '~dir-delete) node (car path))
+                                ((self '~dir-set) node (car path) child))))))))
            ((content)
             (let ((value (if (sync-node? value) (lambda () value) value)))
-              ((self 'r-write!) (map (self 'key->bytes) path) ((self 'obj->node) (cadr value)))))
+              ((self '~r-write!) (map (self '~key->bytes) path) ((self 'obj->node) (cadr value)))))
            (else (error 'invalid-content "Content type not recognized"))))
 
        (define (copy! self source path)
@@ -259,44 +259,42 @@
          > source (list sym|vec): path from the record root to the source data
          > path (list sym|vec): path from the record root to the target data
          < return (bool): boolean indicating success of the operation"
-         (let ((source (map (self 'key->bytes) source)) (path (map (self 'key->bytes) path)))
-           ((self 'r-write!) path ((self 'r-read) source))))
+         (let ((source (map (self '~key->bytes) source)) (path (map (self '~key->bytes) path)))
+           ((self '~r-write!) path ((self '~r-read) source))))
 
-       (define* (prune! self path subpath keep-key?)
+       (define* (prune! self path keep-key?)
          "Prune specified data from a directory while maintaining the
          original hashes. If executed on directory that has not been previously
          pruned or sliced, then the directory becomes an overlayed directory.
 
          > path (list sym|vec): path from the record root to the target directory 
-         > subpath (exp): subpath from the target directory to target data 
          < return (bool): boolean indicating success of the operation"
-         (let ((path (map (self 'key->bytes) path)) (subpath (map (self 'key->bytes) subpath)))
-           ((self 'r-write!) path (let loop ((node ((self 'r-read) path)) (subpath subpath))
-                                    (if (or (sync-null? node) (null? subpath)) (sync-null)
-                                        (let ((child (loop ((self 'dir-get) node (car subpath))
-                                                           (cdr subpath))))
-                                          (if (not (sync-null? child)) ((self 'dir-set) node (car subpath) child)
-                                              ((self 'dir-prune) node (car subpath) keep-key?))))))))
+         (let ((path (map (self '~key->bytes) path)))
+           (set! (self '(1))
+                 (let loop ((node (self '(1))) (path path))
+                   (if (or (sync-null? node) (null? path)) (sync-null)
+                       (let ((child (loop ((self '~dir-get) node (car path))
+                                          (cdr path))))
+                         (if (not (sync-null? child)) ((self '~dir-set) node (car path) child)
+                             ((self '~dir-prune) node (car path) keep-key?))))))))
 
-       (define (slice! self path subpath)
+       (define (slice! self path)
          "Prune all data from directory EXCEPT for the specified path
          while maintaining the original hashes. If executed on directory that
          has not been previously pruned or sliced, then the directory becomes
          an overlayed directory.
 
          > path (list sym|vec): path from the record root to the target directory 
-         > subpath (exp): subpath from the target directory to target data 
          < return (bool): boolean indicating success of the operation"
-         (let ((path (map (self 'key->bytes) path)) (subpath (map (self 'key->bytes) subpath)))
-
-           ((self 'r-write!) path
-            (let loop ((node ((self 'r-read) path)) (subpath subpath))
-              (cond ((null? subpath) node)
-                    ((byte-vector? node) node)
-                    (((self 'struct?) node) node)
-                    (else (let ((key (car subpath)))
-                            ((self 'dir-slice) ((self 'dir-set) node key (loop ((self 'dir-get) node key) (cdr subpath)))
-                                       key))))))))
+         (let ((path (map (self '~key->bytes) path)))
+           (set! (self '(1))
+                 (let loop ((node (self '(1))) (path path))
+                   (cond ((null? path) node)
+                         ((byte-vector? node) node)
+                         (((self '~struct?) node) node)
+                         (else (let ((key (car path)))
+                                 ((self '~dir-slice) ((self '~dir-set) node key (loop ((self '~dir-get) node key) (cdr path)))
+                                  key))))))))
 
        (define (merge! self other)
          "Recursively combine data from two equivalent directories.
@@ -313,15 +311,15 @@
                              ((sync-null? n-2) n-1)
                              ((sync-stub? n-1) n-2)
                              ((sync-stub? n-2) n-1)
-                             (((self 'struct?) n-1) n-1)
-                             (else (let ((n-3 ((self 'dir-merge) n-1 n-2)))
-                                     (let loop-2 ((n-3 n-3) (keys (car ((self 'dir-all) n-3))))
+                             (((self '~struct?) n-1) n-1)
+                             (else (let ((n-3 ((self '~dir-merge) n-1 n-2)))
+                                     (let loop-2 ((n-3 n-3) (keys (car ((self '~dir-all) n-3))))
                                        (if (null? keys) n-3
                                            (let* ((k (car keys))
-                                                  (v-1 ((self 'dir-get) n-1 k))
-                                                  (v-2 ((self 'dir-get) n-2 k))
+                                                  (v-1 ((self '~dir-get) n-1 k))
+                                                  (v-2 ((self '~dir-get) n-2 k))
                                                   (v-3 (loop-1 v-1 v-2)))
-                                             (loop-2 ((self 'dir-set) n-3 k v-3)
+                                             (loop-2 ((self '~dir-set) n-3 k v-3)
                                                      (cdr keys)))))))))))))
 
        (define (valid? self)
@@ -329,11 +327,11 @@
            (cond ((sync-null? node) #t)
                  ((sync-stub? node) #t)
                  ((byte-vector? node) #t)
-                 (((self 'struct?) node) #t)
-                 ((not ((self 'dir-valid?) node)) #f)
-                 (else (let loop-2 ((keys (car ((self 'dir-all) node))))
+                 (((self '~struct?) node) #t)
+                 ((not ((self '~dir-valid?) node)) #f)
+                 (else (let loop-2 ((keys (car ((self '~dir-all) node))))
                          (if (null? keys) #t
                              (if (not (loop-2 (cdr keys))) #f
-                                 (loop-1 ((self 'dir-get) node (car keys))))))))))))
+                                 (loop-1 ((self '~dir-get) node (car keys))))))))))))
 
   ((root 'set!) '(control library record) `(content ,src)))
