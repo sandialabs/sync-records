@@ -2,18 +2,17 @@
 ;; - Signature/docstring doesn't propagate to api level
 ;; - Methods don't override
 
-(lambda (root)
+(macro (path)
 
   (define src
     '(define-class (standard)
        "This is the standard interface for functions"
 
-       (define* (make self class (external ()) (init ()))
+       (define* (make self class (init ()))
          (if (not (eq? (car class) 'define-class))
              (error 'make-error "Please load in a class definition"))
 
          (let* ((name (caadr class))
-                (imports (cdr (cadr class)))
                 (methods (let loop ((body (cddr class)) (methods '()))
                            (cond ((null? body) (reverse methods))
                                  ((string? (car body)) (loop (cdr body) methods))
@@ -53,11 +52,10 @@
                                (cond ((not arg) state)
                                      ((list? arg) (,get arg))
                                      (else (with-let (sublet (rootlet) 'self self '*function* arg)
-                                                     (let (,@(map (lambda (x y) `(,x ,y)) imports external))
-                                                       (case *function*
-                                                         ,@common
-                                                         ,@(map prep methods)
-                                                         (else ,err)))))))))
+                                                     (case *function*
+                                                       ,@common
+                                                       ,@(map prep methods)
+                                                       (else ,err))))))))
                 (object ((eval function) (sync-cons (expression->byte-vector function) (sync-null)))))
            (if (member '*init* (object '*api*))
                (apply (object '*init*) init))
@@ -186,13 +184,15 @@
                               ,@(map proc (reverse serialization)))))
            (eval expr)))))
 
-  (define (self-make class)
-    "Use standard class make function to build itself"
-    (let* ((function (let loop ((body class))
-                       (let ((item (car body)))
-                         (if (and (pair? item) (eq? (car item) 'define*) (eq? (caadr item) 'make))
-                             (cons 'define* (cdr item))
-                             (loop (cdr body)))))))
-      ((eval function) #f class)))
+  `(lambda (root)
 
-  ((root 'set!) '(control library standard) `(content ,((self-make src)))))
+     (define (self-make class)
+       "Use standard class make function to build itself"
+       (let* ((function (let loop ((body class))
+                          (let ((item (car body)))
+                            (if (and (pair? item) (eq? (car item) 'define*) (eq? (caadr item) 'make))
+                                (cons 'define* (cdr item))
+                                (loop (cdr body)))))))
+         ((eval function) #f class)))
+
+     ((root 'set!) ,path `(content ,((self-make ',src))))))

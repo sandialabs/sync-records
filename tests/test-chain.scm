@@ -12,7 +12,7 @@
                     ,@(cddr x))))
          (queries (lambda (chain)
                     (map query
-                         `((journal (let ((chain ((std 'make) (cadr ((root 'get) '(control library ,chain))))))
+                         `((journal (let ((chain ((std 'make) (cadr ((root 'get) '(control class chain))))))
                                       ((root 'set!) '(control test chain-1) `(content ,((std 'dump) chain)))) #t)
                            (journal (let ((chain ((std 'load) (cadr ((root 'get) '(control test chain-1))))))
                                       ((chain 'size))) 0)
@@ -54,7 +54,7 @@
                                       (and (equal? ((chain-1 'digest)) ((chain-2 'digest) -3))
                                            (equal? ((chain-1 'digest)) ((chain-3 'digest) -7)))) #t)
                            (journal (let* ((size 100)
-                                           (chain ((std 'make) (cadr ((root 'get) '(control library ,chain)))))
+                                           (chain ((std 'make) (cadr ((root 'get) '(control class chain)))))
                                            (digests-1 (let loop ((i 0) (digests '()))
                                                         (if (= i size) (reverse digests)
                                                             (begin ((chain 'push!) (sync-null))
@@ -66,7 +66,9 @@
     (run-test
      (append
       (map init '(journal))
-      (map install `((journal ,standard-src) (journal ,linear-chain-src) (journal ,log-chain-src)))
+      (map install `((journal (,standard-src '(control library standard)))
+                     (journal (,linear-chain-src '(control class chain)))
+                     (journal (,log-chain-src '(control class chain)))))
       (queries 'linear-chain)
       (queries 'log-chain)
       ))))

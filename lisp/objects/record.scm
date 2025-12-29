@@ -1,5 +1,4 @@
-(lambda (root)
-
+(macro (path)
   (define src
     '(define-class (record)
 
@@ -90,6 +89,7 @@
                            (sync-cut node)
                            (sync-cons left right))))))))
 
+       ;; todo: is this still necessary?
        (define (~dir-merge self node-1 node-2)
          (let recurse ((node-1 node-1) (node-2 node-2))
            (cond ((and (sync-stub? node-1) (sync-stub? node-2)) node-1)
@@ -296,6 +296,7 @@
                                  ((self '~dir-slice) ((self '~dir-set) node key (loop ((self '~dir-get) node key) (cdr path)))
                                   key))))))))
 
+       ;; todo: is this still necessary?
        (define (merge! self other)
          "Recursively combine data from two equivalent directories.
 
@@ -334,4 +335,5 @@
                              (if (not (loop-2 (cdr keys))) #f
                                  (loop-1 ((self '~dir-get) node (car keys))))))))))))
 
-  ((root 'set!) '(control library record) `(content ,src)))
+  `(lambda (root)
+     ((root 'set!) ,path '(content ,src))))

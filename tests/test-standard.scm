@@ -13,7 +13,7 @@
     (run-test
      (append
       (map init '(journal))
-      (map install `((journal ,standard-src "Installed standard library")))
+      (map install `((journal (,standard-src '(control library standard)) "Installed standard library")))
       (map query
            `((journal ((root 'set!) '(control test source)
                        `(content ,((std 'dump) std) (lambda (x) (eq? (car x) 'sync-node)))) #t)

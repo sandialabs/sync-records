@@ -1,5 +1,4 @@
-(lambda (root)
-
+(macro (path)
   (define src
     '(define-class (linear-chain)
 
@@ -65,4 +64,5 @@
            (if (and (>= index 0) (< index size)) index
                (error 'index-error "Index is out of bounds"))))))
 
-  ((root 'set!) '(control library linear-chain) `(content ,src)))
+  `(lambda (root)
+     ((root 'set!) ,path '(content ,src))))

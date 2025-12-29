@@ -13,7 +13,7 @@
                                       (let* ((std-node (cadr ((root 'get) '(control library standard))))
                                              (std ((eval (byte-vector->expression (sync-car std-node))) std-node))
                                              (cls (cadr ((root 'get) ',cls-path)))
-                                             (obj (apply (std 'make) (cons cls ,make-args))))
+                                             (obj (apply (std 'make) (cons cls ',make-args))))
                                         ((root 'set!) '(control test ,obj-name) `(content ,(obj)))))) #t))))
          (query (lambda (args)
                   `(,(car args)
@@ -33,11 +33,11 @@
     (run-test
      (append
       (map init '(journal))
-      (map install `((journal ,standard-src "Installed standard library")
-                     (journal ,record-src "Installed record class")))
-      (map instantiate `((journal record-1 (control library record))
-                         (journal record-2 (control library record))
-                         (journal record-3 (control library record))))
+      (map install `((journal (,standard-src '(control library standard)) "Installed standard library")
+                     (journal (,record-src '(control class record)) "Installed record class")))
+      (map instantiate `((journal record-1 (control class record))
+                         (journal record-2 (control class record))
+                         (journal record-3 (control class record))))
       (map query
            `((journal (record-1) ((record-1 'set!) '(a b) '(content 2)) #t)
              (journal (record-1) ((record-1 'set!) '(a c d) '(content 4)) #t)
