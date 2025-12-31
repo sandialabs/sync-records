@@ -244,7 +244,7 @@
 
   (define query
     '(lambda (root query)
-       (let ((result ((root 'get) `(control local ,(car query)))))
+       (let ((result ((root 'get) `(control endpoint ,(car query)))))
          (if (eq? (car result) 'nothing)
              (error 'unknown-function "Function not found")
              (apply (eval (cadr result)) (cons root (cdr query)))))))

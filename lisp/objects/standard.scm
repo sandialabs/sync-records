@@ -42,10 +42,11 @@
                        (arg-1 arg-2)
                        (set! state
                              (let loop ((node (self)) (path (if arg-2 arg-1 '())))
-                               (if (null? path) (if arg-2 arg-2 arg-1)
-                                   (if (zero? (car path))
-                                       (sync-cons (loop (sync-car node) (cdr path)) (sync-cdr node))
-                                       (sync-cons (sync-car node) (loop (sync-cdr node) (cdr path))))))) #t))
+                                 (if (null? path) (if arg-2 arg-2 arg-1)
+                                     (let ((node (if (sync-pair? node) node (sync-cons (sync-null) (sync-null)))))
+                                       (if (zero? (car path))
+                                           (sync-cons (loop (sync-car node) (cdr path)) (sync-cdr node))
+                                           (sync-cons (sync-car node) (loop (sync-cdr node) (cdr path)))))))) #t))
                 (function `(lambda (state)
                              (define* (self arg) ,description
                                (set! (setter self) ,set)
@@ -109,8 +110,8 @@
                            ((byte-vector? node-1) node-1)
                            ((sync-stub? node-1) node-2)
                            ((sync-stub? node-2) node-1)
-                           (sync-cons (recurse (sync-car node-1) (sync-car node-2))
-                                      (recurse (sync-cdr node-1) (sync-cdr node-2))))))))
+                           (else (sync-cons (recurse (sync-car node-1) (sync-car node-2))
+                                      (recurse (sync-cdr node-1) (sync-cdr node-2)))))))))
 
        (define (deep-copy! self object path-source path-target)
          (let ((value ((self 'deep-get) object path-source)))

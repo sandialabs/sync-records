@@ -20,6 +20,9 @@
        (define (size self)
          (byte-vector->expression (self '(1 0))))
 
+       (define (index self index~)
+         ((self '~adjust) index~))
+
        (define (push! self data)
          (let ((size ((self 'size))))
            (set! (self '(1)) (sync-cons (expression->byte-vector (+ size 1))

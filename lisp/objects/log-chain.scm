@@ -10,6 +10,9 @@
        (define (size self)
          (byte-vector->expression (self '(1 0))))
 
+       (define (index self index~)
+         ((self '~adjust) index~))
+
        (define (get self index)
          (let* ((size ((self 'size)))
                 (index ((self '~adjust) index size))
