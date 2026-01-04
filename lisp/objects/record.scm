@@ -1,4 +1,5 @@
 (macro (path)
+
   (define src
     '(define-class (record)
 
@@ -141,7 +142,7 @@
          (sync-cons (sync-null) (sync-null)))
 
        (define (~struct? self node)
-         (and (sync-pair? node) (equal? (sync-car node) (self '~struct-tag))))
+         (and (sync-pair? node) (equal? (sync-car node) ((self '~struct-tag)))))
 
        (define (~r-read self path)
          (let loop ((node (self '(1))) (path path))
@@ -161,7 +162,7 @@
 
        (define (obj->node self obj)
          (cond ((sync-node? obj) obj)
-               ((procedure? obj) (sync-cons (self '~struct-tag) (obj)))
+               ((procedure? obj) (sync-cons ((self '~struct-tag)) (obj)))
                ((byte-vector? obj) (append #u(0) obj)) 
                (else (append #u(1) (expression->byte-vector obj)))))
 
@@ -174,7 +175,7 @@
                ((sync-null? node) node)
                ((sync-stub? node) node)
                ((sync-pair? node)
-                (if (not (equal? (sync-car node) (self '~struct-tag))) node
+                (if (not ((self '~struct?) node)) node
                     (lambda () (sync-cdr node))))
                (else (error 'invalid-type "Invalid value type"))))
 
@@ -196,7 +197,8 @@
              (if (sync-node? obj)
                  (cond ((sync-null? obj) '(nothing))
                        ((sync-stub? obj) '(unknown))
-                       (else (let ((all ((self '~dir-all) obj)))
+                       (else
+                        (let ((all ((self '~dir-all) obj)))
                                `(directory ,(map (self '~bytes->key) (car all)) ,(cadr all)))))
                  (cond ((procedure? obj) `(content ,(obj)))
                        (else `(content ,obj)))))))
@@ -245,8 +247,8 @@
                             (if (equal? child ((self '~dir-new))) ((self '~dir-delete) node (car path))
                                 ((self '~dir-set) node (car path) child))))))))
            ((content)
-            (let ((value (if (sync-node? value) (lambda () value) value)))
-              ((self '~r-write!) (map (self '~key->bytes) path) ((self 'obj->node) (cadr value)))))
+            (let ((content (if (sync-node? (cadr value)) (lambda () (cadr value)) (cadr value))))
+              ((self '~r-write!) (map (self '~key->bytes) path) ((self 'obj->node) content))))
            (else (error 'invalid-content "Content type not recognized"))))
 
        (define (copy! self source path)
