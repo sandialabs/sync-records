@@ -13,9 +13,14 @@
              (if (= i index) (sync-car node)
                  (loop (sync-cdr node) (- i 1))))))
 
+       (define (previous self index)
+         (let* ((index ((self '~adjust) index))
+                (main (self (make-list (+ (- ((self 'size)) index) 1) 1))))
+           ((eval (byte-vector->expression (self '(0))))
+            (sync-cons (self '(0)) (sync-cons (expression->byte-vector (+ index 1)) main)))))
+
        (define* (digest self (index (- ((self 'size)) 1)))
-         (let ((index ((self '~adjust) index)))
-           (sync-digest (self (make-list (+ (- ((self 'size)) index) 1) 1)))))
+         (sync-digest (((self 'previous) index))))
 
        (define (size self)
          (byte-vector->expression (self '(1 0))))

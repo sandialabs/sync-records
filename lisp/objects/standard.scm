@@ -2,6 +2,14 @@
 ;; - Signature/docstring doesn't propagate to api level
 ;; - Methods don't override
 
+;; todo: issue!!!! 'get does not transparently facilityate objects -- chain and record encode objects differently. options
+;; - standardize the content/nothing/unknown language into the standard level
+;;   - ewwwwwwwwww
+;; - implement special *get* *set* that deals only with nodes
+;;   - do this, then can standardize object encoding as part of it
+;;   - and maybe return procedure as well, so procedure or #f
+
+
 (macro (path)
 
   (define src
