@@ -37,14 +37,13 @@ messenger="(lambda (journal)
               (begin (print result)
                      (error 'message-error \"Message returned an error\"))))))"
 
-control=$( cat ../lisp/objects/control.scm )
-standard=$( cat ../lisp/objects/standard.scm )
-linear_chain=$( cat ../lisp/objects/linear-chain.scm )
-log_chain=$( cat ../lisp/objects/log-chain.scm )
-record=$( cat ../lisp/objects/record.scm )
-config=$( cat ../lisp/objects/configuration.scm )
-ledger=$( cat ../lisp/objects/ledger.scm )
-# ontology=$( cat ../lisp/ontology.scm )
+control=$( cat ../lisp/control.scm )
+standard=$( cat ../lisp/standard.scm )
+linear_chain=$( cat ../lisp/linear-chain.scm )
+log_chain=$( cat ../lisp/log-chain.scm )
+record=$( cat ../lisp/record.scm )
+config=$( cat ../lisp/configuration.scm )
+ledger=$( cat ../lisp/ledger.scm )
 
 echo "--- Control Test ---"
 $sdk -e "($( cat ./test-control.scm ) $run $messenger '$control)"
@@ -60,6 +59,3 @@ $sdk -e "($( cat ./test-record.scm ) $run $messenger '$control '$standard '$reco
 
 echo "--- Ledger Test ---"
 $sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$control '$standard '$log_chain '$record '$config '$ledger)"
-
-# echo "--- Ontology Test ---"
-# $sdk -e "($( cat ./test-ontology.scm ) $run $messenger '$record '$control '$ledger '$ontology)"

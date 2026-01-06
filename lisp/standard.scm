@@ -1,39 +1,3 @@
-;; Current shortcomings
-;; - Signature/docstring doesn't propagate to api level
-;; - Methods don't override
-
-;; todo: issue!!!! 'get does not transparently facilityate objects -- chain and record encode objects differently. options
-;; - standardize the content/nothing/unknown language into the standard level
-;;   - actually seems like it might be safest
-;;   - and requires the least change I think
-;;   - should probably have a special "object" marker
-;;   - also the most flexible
-;; - implement special *get* *set* that deals only with nodes
-;;   - so get/set but if function returns a procedure, then consider it to be an object??
-;;   - can it be terminal if procedure?
-;;   - do this, then can standardize object encoding as part of it
-;;   - and maybe return procedure as well, so procedure oorrr (lambda () (sync-null))
-;;   - kinda weird to have deletion be different
-;;     - but maybe can deal here in (sync-nulls)
-;;     - problem is sync null doesn't always signify deletion
-;;     - and how would we know to convert back????
-;;   - require *get*/*set* and get/set
-;;   - or maybe get/set and node->object/object->node
-;;   - or maybe get/set and option for raw/not raw
-;; - okay, so we're set on having special nodes OR procedures for when there is an extension object
-;; - ... or maybe standardize the type flag. mhm...
-
-;; (unknown)
-;; (nothing)
-;; (node ..)
-;; (object ..)
-
-;; how to handle record?
-;; - if directory, return (directory () #t)
-;; - if nothing, return (nothing)
-;; - if unknown, return (unkown)
-;; - forbid adding something that mimics (directory), (nothing) or (unknown) 
-
 (macro* (path (debug '()))
 
   (define src
