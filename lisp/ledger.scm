@@ -154,12 +154,12 @@
                    (if (eq? (car ((record 'get) `(ledger pinned ,index))) 'nothing)
                        ((record 'copy!) '(control scratch local) `(ledger pinned ,index))
                        ((record 'merge!) '(control scratch local) `(ledger pinned ,index))))
-                  ((and (> (length path) 1) (eq? (car path) '*peer*))
+                  ((and (> (length path) 1) (eq? (car path) '*peers*))
                    (let ((store '(control scratch pin)))
                      (,ledger-fetch record path index store)
                      ((record 'merge!) '(control scratch pin) store)))
                   (else
-                   (error 'path-error "Path must start with *state* or *peer* have length > 1"))))))
+                   (error 'path-error "Path must start with *state* or *peers* have length > 1"))))))
 
      (define ledger-unpin!
        `(lambda (record path index)
@@ -173,9 +173,9 @@
                  (index (cadr ((record 'get) (append chain-path '(index))))))
             (cond ((and (> (length path) 1) (eq? (car path) '*state*))
                    ((record 'prune!) `(ledger pinned ,index) path))
-                  ((and (> (length path) 1) (eq? (car path) '*peer*))
+                  ((and (> (length path) 1) (eq? (car path) '*peers*))
                    ((record 'prune!) `(ledger pinned ,index) path))
-                  (else (error 'path-error "Path must start with *state* or *peer* and have length > 1"))))))
+                  (else (error 'path-error "Path must start with *state* or *peers* and have length > 1"))))))
 
      (define ledger-operate
        `(lambda (operate path index)
@@ -195,7 +195,7 @@
                            (let ((store '(control scratch get)))
                              (,ledger-fetch record path index store)
                              (operate (append store (list-tail path 2)))))
-                          (else (error 'path-error "Path must start with *state* or *peer*"))))))))
+                          (else (error 'path-error "Path must start with *state* or *peers*"))))))))
 
      (define ledger-get
        `(lambda*
