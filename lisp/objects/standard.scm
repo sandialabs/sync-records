@@ -4,16 +4,40 @@
 
 ;; todo: issue!!!! 'get does not transparently facilityate objects -- chain and record encode objects differently. options
 ;; - standardize the content/nothing/unknown language into the standard level
-;;   - ewwwwwwwwww
+;;   - actually seems like it might be safest
+;;   - and requires the least change I think
+;;   - should probably have a special "object" marker
+;;   - also the most flexible
 ;; - implement special *get* *set* that deals only with nodes
+;;   - so get/set but if function returns a procedure, then consider it to be an object??
+;;   - can it be terminal if procedure?
 ;;   - do this, then can standardize object encoding as part of it
-;;   - and maybe return procedure as well, so procedure or #f
+;;   - and maybe return procedure as well, so procedure oorrr (lambda () (sync-null))
+;;   - kinda weird to have deletion be different
+;;     - but maybe can deal here in (sync-nulls)
+;;     - problem is sync null doesn't always signify deletion
+;;     - and how would we know to convert back????
+;;   - require *get*/*set* and get/set
+;;   - or maybe get/set and node->object/object->node
+;;   - or maybe get/set and option for raw/not raw
+;; - okay, so we're set on having special nodes OR procedures for when there is an extension object
+;; - ... or maybe standardize the type flag. mhm...
 
+;; (unknown)
+;; (nothing)
+;; (node ..)
+;; (object ..)
 
-(macro (path)
+;; how to handle record?
+;; - if directory, return (directory () #t)
+;; - if nothing, return (nothing)
+;; - if unknown, return (unkown)
+;; - forbid adding something that mimics (directory), (nothing) or (unknown) 
+
+(macro* (path (debug '()))
 
   (define src
-    '(define-class (standard)
+    `(define-class (standard)
        "This is the standard interface for functions"
 
        (define* (make self class (init ()))
@@ -39,7 +63,12 @@
                                      "-------------------------"))
                 (err '(error 'function-error (append "Function not recognized: " (symbol->string *function*))))
                 (common `(((*name*) ,name) ((*api*) '(*name* *api* *class* ,@(map car methods))) ((*class*) ,class)))
-                (prep (lambda (x) `((,(car x)) (lambda args (apply ,(cadr x) (cons self args))))))
+                (debug-1 (if (member name ',debug) `((print ',name '-> `(,*function* ,args))) '()))
+                (debug-2 (if (member name ',debug) `((print ',name '<- `(,*function* ,args) `,res)) '()))
+                (prep (lambda (x) `((,(car x)) (lambda args ,@debug-1
+                                                       (let ((res (apply ,(cadr x) (cons self args))))
+                                                         ,@debug-2
+                                                         res)))))
                 (get '(lambda (path)
                         (let loop ((node (self)) (path path))
                           (if (null? path) node
@@ -204,4 +233,4 @@
                                 (loop (cdr body)))))))
          ((eval function) #f class)))
 
-     ((root 'set!) ,path `(content ,((self-make ',src))))))
+     ((root 'set!) ,path ((self-make ',src)))))

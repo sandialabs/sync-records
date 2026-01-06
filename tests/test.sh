@@ -31,7 +31,11 @@ run="(lambda (script)
                   (loop (cdr input)))))))))"
 
 messenger="(lambda (journal) 
-    \`(lambda (msg) (sync-call msg #t ,(sync-hash (expression->byte-vector journal)))))"
+    \`(lambda (msg)
+        (let ((result (sync-call msg #t ,(sync-hash (expression->byte-vector journal)))))
+          (if (not (and (list? result) (not (null? result)) (eq? (car result) 'error))) result
+              (begin (print result)
+                     (error 'message-error \"Message returned an error\"))))))"
 
 control=$( cat ../lisp/objects/control.scm )
 standard=$( cat ../lisp/objects/standard.scm )

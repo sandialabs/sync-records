@@ -73,4 +73,4 @@
                (error 'index-error "Index is out of bounds"))))))
 
   `(lambda (root)
-     ((root 'set!) ,path '(content ,src))))
+     ((root 'set!) ,path ',src)))

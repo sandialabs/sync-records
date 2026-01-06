@@ -200,8 +200,8 @@
                        (else
                         (let ((all ((self '~dir-all) obj)))
                                `(directory ,(map (self '~bytes->key) (car all)) ,(cadr all)))))
-                 (cond ((procedure? obj) `(content ,(obj)))
-                       (else `(content ,obj)))))))
+                 (cond ((procedure? obj) (obj))
+                       (else obj))))))
 
        (define (equal? self source path)
          "Indicate whether two paths that contain identical data
@@ -237,19 +237,20 @@
          > path (list sym|vec): path from the record root to the data
          > value (exp|sync-pair): data to be stored at the path
          < return (bool): boolean indicating success of the operation"
-         (case (car value)
-           ((nothing)
-            (set! (self '(1))
-                  (let ((path (map (self '~key->bytes) path)))
-                    (let loop ((node (self '(1))) (path path))
-                      (if (null? path) ((self '~dir-new))
-                          (let ((child (loop ((self '~dir-get) node (car path)) (cdr path))))
-                            (if (equal? child ((self '~dir-new))) ((self '~dir-delete) node (car path))
-                                ((self '~dir-set) node (car path) child))))))))
-           ((content)
-            (let ((content (if (sync-node? (cadr value)) (lambda () (cadr value)) (cadr value))))
-              ((self '~r-write!) (map (self '~key->bytes) path) ((self 'obj->node) content))))
-           (else (error 'invalid-content "Content type not recognized"))))
+         (cond ((equal? value '(unknown))
+                (error 'value-error "Value conflicts with key expression '(unknown)"))
+               ((and (list? value) (not (null? value)) (eq? (car value) 'directory))
+                (error 'value-error "Value resembles key expression pattern '(directory ..)"))
+               ((equal? value '(nothing))
+                (set! (self '(1))
+                      (let ((path (map (self '~key->bytes) path)))
+                        (let loop ((node (self '(1))) (path path))
+                          (if (null? path) ((self '~dir-new))
+                              (let ((child (loop ((self '~dir-get) node (car path)) (cdr path))))
+                                (if (equal? child ((self '~dir-new))) ((self '~dir-delete) node (car path))
+                                    ((self '~dir-set) node (car path) child))))))))
+               (else (let ((content (if (sync-node? value) (lambda () value) value)))
+                       ((self '~r-write!) (map (self '~key->bytes) path) ((self 'obj->node) content))))))
 
        (define (copy! self source path)
          "Copy data from the source path to the target path.
@@ -338,4 +339,4 @@
                                  (loop-1 ((self '~dir-get) node (car keys))))))))))))
 
   `(lambda (root)
-     ((root 'set!) ,path '(content ,src))))
+     ((root 'set!) ,path ',src)))
