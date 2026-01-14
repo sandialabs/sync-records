@@ -41,7 +41,7 @@ control=$( cat ../lisp/control.scm )
 standard=$( cat ../lisp/standard.scm )
 linear_chain=$( cat ../lisp/linear-chain.scm )
 log_chain=$( cat ../lisp/log-chain.scm )
-record=$( cat ../lisp/record.scm )
+tree=$( cat ../lisp/tree.scm )
 config=$( cat ../lisp/configuration.scm )
 ledger=$( cat ../lisp/ledger.scm )
 
@@ -54,8 +54,8 @@ $sdk -e "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
 echo "--- Chain Test ---"
 $sdk -e "($( cat ./test-chain.scm ) $run $messenger '$control '$standard '$linear_chain '$log_chain)"
 
-echo "--- Record Test ---"
-$sdk -e "($( cat ./test-record.scm ) $run $messenger '$control '$standard '$record)"
+echo "--- Tree Test ---"
+$sdk -e "($( cat ./test-tree.scm ) $run $messenger '$control '$standard '$tree)"
 
 echo "--- Ledger Test ---"
-$sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$control '$standard '$log_chain '$record '$config '$ledger)"
+$sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$control '$standard '$log_chain '$tree '$config '$ledger)"

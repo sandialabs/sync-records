@@ -1,7 +1,7 @@
 (macro (path)
 
   (define src
-    '(define-class (record)
+    '(define-class (tree)
 
        (define (~key-bits self key)
          (let loop-1 ((bytes (map (lambda (x) x) (sync-hash key))) (ret '()))
@@ -182,7 +182,7 @@
        (define (get self path)
          "Retrieve the data at the specified path.
 
-         > path (list sym|vec): path from the record root to data
+         > path (list sym|vec): path from the tree root to data
          < return (sym . (list exp)): list containing the type and value of the data
              - 'object type indicates a simple lisp-serializable value
              - 'structure type indicates a complex value represented by sync-pair?
@@ -206,8 +206,8 @@
        (define (equal? self source path)
          "Indicate whether two paths that contain identical data
 
-         > path (list sym|vec): path from the record root to source data
-         > target (list sym|vec): path from the record root to target data
+         > path (list sym|vec): path from the tree root to source data
+         > target (list sym|vec): path from the tree root to target data
          < return (bool): if paths are equal then #t, otherwise #f"
          (let ((source (map (self '~key->bytes) source)) (path (map (self '~key->bytes) path)))
            (equal? ((self '~r-read) source) ((self '~r-read) path))))
@@ -216,8 +216,8 @@
          "Indicate whether two paths point to data that was formed
          from an identical originating data structure (before possible pruning)
 
-         > path (list sym|vec): path from the record root to source data
-         > target (list sym|vec): path from the record root to target data
+         > path (list sym|vec): path from the tree root to source data
+         > target (list sym|vec): path from the tree root to target data
          < return (bool): if paths are equivalent then #t, otherwise #f"
          (let ((source (map (self '~key->bytes) source)) (path (map (self '~key->bytes) path)))
            (let ((val-1 ((self '~r-read) source)) (val-2 ((self '~r-read) path)))
@@ -234,7 +234,7 @@
          at the path and recursively delete empty parent directories as
          necessary.
 
-         > path (list sym|vec): path from the record root to the data
+         > path (list sym|vec): path from the tree root to the data
          > value (exp|sync-pair): data to be stored at the path
          < return (bool): boolean indicating success of the operation"
          (cond ((equal? value '(unknown))
@@ -259,8 +259,8 @@
          the value is #f, then delete the data at the path and recursively
          delete empty parent directories as necessary.
 
-         > source (list sym|vec): path from the record root to the source data
-         > path (list sym|vec): path from the record root to the target data
+         > source (list sym|vec): path from the tree root to the source data
+         > path (list sym|vec): path from the tree root to the target data
          < return (bool): boolean indicating success of the operation"
          (let ((source (map (self '~key->bytes) source)) (path (map (self '~key->bytes) path)))
            ((self '~r-write!) path ((self '~r-read) source))))
@@ -270,7 +270,7 @@
          original hashes. If executed on directory that has not been previously
          pruned or sliced, then the directory becomes an overlayed directory.
 
-         > path (list sym|vec): path from the record root to the target directory 
+         > path (list sym|vec): path from the tree root to the target directory 
          < return (bool): boolean indicating success of the operation"
          (let ((path (map (self '~key->bytes) path)))
            (set! (self '(1))
@@ -287,7 +287,7 @@
          has not been previously pruned or sliced, then the directory becomes
          an overlayed directory.
 
-         > path (list sym|vec): path from the record root to the target directory 
+         > path (list sym|vec): path from the tree root to the target directory 
          < return (bool): boolean indicating success of the operation"
          (let ((path (map (self '~key->bytes) path)))
            (set! (self '(1))
@@ -303,8 +303,8 @@
        (define (merge! self other)
          "Recursively combine data from two equivalent directories.
 
-         > source (list sym|vec): path from the record root to the source directory 
-         > path (list sym|vec): path from the record root to the target directory 
+         > source (list sym|vec): path from the tree root to the source directory 
+         > path (list sym|vec): path from the tree root to the target directory 
          < return (bool): boolean indicating success of the operation"
          (let ((node-1 (self '(1))) (node-2 (other '(1))))
            (if (or (sync-null? node-1) (not (equal? (sync-digest node-1) (sync-digest node-2)))) #f
