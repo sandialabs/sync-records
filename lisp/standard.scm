@@ -1,4 +1,4 @@
-(macro* (path (debug '()))
+(macro* (class-path object-path (debug '()))
 
   (define src
     `(define-class (standard)
@@ -197,4 +197,5 @@
                                 (loop (cdr body)))))))
          ((eval function) #f class)))
 
-     ((root 'set!) ,path ((self-make ',src)))))
+     ((root 'set!) ,class-path ((self-make ',src)))
+     ((root 'set!) ,object-path ((self-make ',src)))))

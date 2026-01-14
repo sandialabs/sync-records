@@ -6,7 +6,7 @@
                   `(,(car x)
                     (*call* ,(pass (car x))
                             (lambda (root)
-                              (let* ((std-node ((root 'get) '(control library standard)))
+                              (let* ((std-node ((root 'get) '(control object standard)))
                                      (std ((eval (byte-vector->expression (sync-car std-node))) std-node)))
                                 ,(cadr x))))
                     ,@(cddr x))))
@@ -67,9 +67,9 @@
     (run-test
      (append
       (map init '(journal))
-      (map install `((journal (,standard-src '(control library standard)))
-                     (journal (,linear-chain-src '(control class linear-chain)))
-                     (journal (,log-chain-src '(control class log-chain)))))
+      (map install `((journal (,standard-src '(control class standard) '(control object standard)))
+                     (journal (lambda (root) ((root 'set!) '(control class linear-chain) ',linear-chain-src)))
+                     (journal (lambda (root) ((root 'set!) '(control class log-chain) ',log-chain-src)))))
       (queries 'linear-chain)
       (queries 'log-chain)
       ))))

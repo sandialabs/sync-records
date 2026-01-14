@@ -1,14 +1,3 @@
-;; authentication options
-;; - have some kind of configurable system within the query handler
-;; - wrap in some kind of master authentication system
-;;   - could bake into the API somehow
-;; - for every query
-;; - ask authenticator if allowed, get #t/#f
-;; - maybe all local comes with authentication?
-;; - that just sounds like wrapping it into the functionality
-;; - why not?
-;; - implies we just have one interface or ledger, basically
-
 (lambda (secret)
   (define transition-function
     '(lambda (*sync-state* query)
@@ -196,26 +185,6 @@
            (if (null? exprs) (newline)
                (begin (display (car exprs)) (display " ") (loop (cdr exprs))))))
 
-       (define-macro (trace name)
-         (let ((name-new (gensym)))
-           `(begin
-              (define ,name-new ,name)
-              (define (,name . args)
-                (display ">> ")
-                (print (cons ,name args))
-                (apply ,name-new args)))))
-
-       (define trace-all
-         (cons 'begin
-               (let loop ((env (map car (curlet))) (ls '()))
-                 (if (null? env) ls
-                     (if (or (not (procedure? (eval (car env))))
-                             (eq? (car env) 'print))
-                         (loop (cdr env) ls)
-                         (loop (cdr env) (cons `(trace ,(car env)) ls)))))))
-
-       ;; (eval trace-all)
-       
        (lambda*
         (function)
         (if (not function) state

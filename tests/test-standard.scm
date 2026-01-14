@@ -6,14 +6,14 @@
                   `(,(car x)
                     (*call* ,(pass (car x))
                             (lambda (root)
-                              (let* ((std-node ((root 'get) '(control library standard)))
+                              (let* ((std-node ((root 'get) '(control object standard)))
                                      (std ((eval (byte-vector->expression (sync-car std-node))) std-node)))
                                 ,(cadr x))))
                     ,@(cddr x)))))
     (run-test
      (append
       (map init '(journal))
-      (map install `((journal (,standard-src '(control library standard)) "Installed standard library")))
+      (map install `((journal (,standard-src '(control class standard) '(control object standard)) "Installed standard library")))
       (map query
            `((journal ((root 'set!) '(control test source)
                        ((std 'dump) std)) #t)

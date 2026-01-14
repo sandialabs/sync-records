@@ -10,7 +10,7 @@
                           `(,journal-name
                             (*call* ,(pass journal-name)
                                     (lambda (root)
-                                      (let* ((std-node ((root 'get) '(control library standard)))
+                                      (let* ((std-node ((root 'get) '(control object standard)))
                                              (std ((eval (byte-vector->expression (sync-car std-node))) std-node))
                                              (cls ((root 'get) ',cls-path))
                                              (obj (apply (std 'make) (cons cls ',make-args))))
@@ -19,7 +19,7 @@
                   `(,(car args)
                     (*call* ,(pass (car args))
                             (lambda (root)
-                              (let* ((std-node ((root 'get) '(control library standard)))
+                              (let* ((std-node ((root 'get) '(control object standard)))
                                      (std ((eval (byte-vector->expression (sync-car std-node))) std-node))
                                      ,@(map (lambda (x)
                                               `(,x ((std 'load) ((root 'get) '(control test ,x)))))
@@ -33,8 +33,8 @@
     (run-test
      (append
       (map init '(journal))
-      (map install `((journal (,standard-src '(control library standard)) "Installed standard library")
-                     (journal (,tree-src '(control class tree)) "Installed tree class")))
+      (map install `((journal (,standard-src '(control class standard) '(control object standard)) "Installed standard library")
+                     (journal (lambda (root) ((root 'set!) '(control class tree) ',tree-src)))))
       (map instantiate `((journal tree-1 (control class tree))
                          (journal tree-2 (control class tree))
                          (journal tree-3 (control class tree))))
