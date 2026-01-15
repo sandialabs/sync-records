@@ -1,4 +1,4 @@
-(lambda (secret)
+(macro (secret)
   (define transition-function
     '(lambda (*sync-state* query)
        (let* ((control-node (sync-car *sync-state*))

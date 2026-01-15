@@ -59,9 +59,11 @@
       ((self '~field) 'temp ((standard 'make) chain-class))
       ((self '~field) 'perm ((standard 'make) chain-class))))
 
-  (define* (config self (public? #t))
-    (if public? ((((self '~field) 'config) 'get) '(public))
-        (((self '~fiekld) 'config) 'get) '()))
+  (define (configuration self)
+    (((self '~field) 'config) 'get) '())
+
+  (define (information self)
+    ((((self '~field) 'config) 'get) '(public)))
 
   (define* (size self)
     (let ((perm ((self '~field) 'perm)))
@@ -167,7 +169,7 @@
       ((perm 'push!) (stage))
       ((self '~signature-sign!) perm)
       ((temp 'push!) ((perm 'get) -1))
-      (if (>= ((temp 'size)) window) ((temp 'prune!) (- window)))
+      (if (and window (>= ((temp 'size)) window)) ((temp 'prune!) (- window)))
       ((standard 'deep-prune!) perm '(-1 (*state*)))
       ((self '~field) 'perm perm)
       ((self '~field) 'temp temp)
