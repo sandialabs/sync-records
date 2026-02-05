@@ -66,12 +66,16 @@
     ((((self '~field) 'config) 'get) '(public)))
 
   (define* (size self)
+    (print 'bladsfsdf)
     (let ((perm ((self '~field) 'perm)))
       ((perm 'size))))
 
   (define (peer! self name info)
+    ;; todo: reach out and ask peer for public key (maybe? need a "config" endpoint)
     (let ((config ((self '~field) 'config)))
       ((config 'set!) `(private peer ,name) info)
+      ((config 'set!) `(private peer ,name public-key)
+       (cadr (assoc 'public-key ((eval (cadr (assoc 'information info)))))))
       ((self '~field) 'config config)))
 
   (define (peers self)
