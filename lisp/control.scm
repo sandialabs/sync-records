@@ -35,7 +35,7 @@
            (let* ((query-handler (eval (byte-vector->expression (sync-cdr node-10)))))
              (update! (query-handler root query))))
 
-         (define (control-set key value)
+         (define (control-set key secret value)
            (authenticate secret)
            (let* ((node-10 (sync-car node-1))
                   (step-node (if (eq? key 'step) (expression->byte-vector value) (sync-car node-10)))
