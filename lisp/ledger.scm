@@ -66,7 +66,6 @@
     ((((self '~field) 'config) 'get) '(public)))
 
   (define* (size self)
-    (print 'bladsfsdf)
     (let ((perm ((self '~field) 'perm)))
       ((perm 'size))))
 
