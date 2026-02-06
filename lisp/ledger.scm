@@ -191,7 +191,7 @@
            (window ((config 'get) '(public window)))
            (target ((perm 'index) (if (>= (car path) 0) (car path) (+ index 1 (car path)))))
            (current (- ((perm 'size)) 1)))
-      (let* ((chain (if (< target (- current window)) perm ((self '~field) 'temp)))
+      (let* ((chain (if (and window (< target (- current window))) perm ((self '~field) 'temp)))
              (chain ((chain 'previous) index)))
         (if (and (eq? (caadr path) '*peer*) (> (length path) 2))
             (let* ((pref (reverse (list-tail (reverse path) (- (length path) 2))))
