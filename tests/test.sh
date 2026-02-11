@@ -31,18 +31,31 @@ run="(lambda (script)
                   (loop (cdr input)))))))))"
 
 messenger="(lambda (journal) 
-    \`(lambda (msg) (sync-call msg #t ,(sync-hash (expression->byte-vector journal)))))"
+    \`(lambda (msg)
+        (let ((result (sync-call msg #t ,(sync-hash (expression->byte-vector journal)))))
+          (if (not (and (list? result) (not (null? result)) (eq? (car result) 'error))) result
+              (begin (print result)
+                     (error 'message-error \"Message returned an error\"))))))"
 
-record=$( cat ../lisp/record.scm )
 control=$( cat ../lisp/control.scm )
+standard=$( cat ../lisp/standard.scm )
+linear_chain=$( cat ../lisp/linear-chain.scm )
+log_chain=$( cat ../lisp/log-chain.scm )
+tree=$( cat ../lisp/tree.scm )
+config=$( cat ../lisp/configuration.scm )
 ledger=$( cat ../lisp/ledger.scm )
-ontology=$( cat ../lisp/ontology.scm )
 
-echo "--- Record Test ---"
-$sdk -e "($( cat ./test-record.scm ) $run $messenger '$record '$control)"
+echo "--- Control Test ---"
+$sdk -e "($( cat ./test-control.scm ) $run $messenger '$control)"
+
+echo "--- Standards Test  ---"
+$sdk -e "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
+
+echo "--- Chain Test ---"
+$sdk -e "($( cat ./test-chain.scm ) $run $messenger '$control '$standard '$linear_chain '$log_chain)"
+
+echo "--- Tree Test ---"
+$sdk -e "($( cat ./test-tree.scm ) $run $messenger '$control '$standard '$tree)"
 
 echo "--- Ledger Test ---"
-$sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$record '$control '$ledger)"
-
-echo "--- Ontology Test ---"
-$sdk -e "($( cat ./test-ontology.scm ) $run $messenger '$record '$control '$ledger '$ontology)"
+$sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$control '$standard '$log_chain '$tree '$config '$ledger)"
