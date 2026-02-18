@@ -165,7 +165,7 @@
              (journal-1 ((ledger 'get) '(-1 (*peer* journal-2 chain) -1
                                             (*peer* journal-3 chain) -1
                                             (*peer* journal-5 chain) -1
-                                            (*state* g h i))) "world")
+                                            (*state* g h i)) #t) (lambda (x) (equal? (cadr (assoc 'content x)) "world")))
 
              (journal-1 ((ledger 'get) '(2 (*state* do pin))) '(directory (this that) #t))
              (journal-1 ((ledger 'get) '(2 (*state* do pin this))) "yes")
