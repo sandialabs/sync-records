@@ -74,7 +74,7 @@
 
   (define (~dir-prune self node key keep-key?)
     (let loop ((node node) (bits ((self '~key-bits) key)))
-      (if (or (sync-null? node) (sync-stub? node)) (sync-null)
+      (if (or (sync-null? node) (sync-stub? node)) node
           (let ((left (sync-car node)) (right (sync-cdr node)))
             (if (byte-vector? left)
                 (if (not (equal? left key)) node
@@ -272,11 +272,12 @@
     (let ((path (map (self '~key->bytes) path)))
       (set! (self '(1))
             (let loop ((node (self '(1))) (path path))
-              (if (or (sync-null? node) (null? path)) (sync-null)
-                  (let ((child (loop ((self '~dir-get) node (car path))
-                                     (cdr path))))
-                    (if (not (sync-null? child)) ((self '~dir-set) node (car path) child)
-                        ((self '~dir-prune) node (car path) keep-key?))))))))
+              (cond ((sync-null? node) node)
+                    ((null? path) (sync-cut node))
+                    (else (let ((child (loop ((self '~dir-get) node (car path)) (cdr path))))
+                            (if (and (not (sync-stub? child)) (not (sync-null? child)))
+                                ((self '~dir-set) node (car path) child)
+                                ((self '~dir-prune) node (car path) keep-key?)))))))))
 
   (define (slice! self path)
     "Prune all data from directory EXCEPT for the specified path
