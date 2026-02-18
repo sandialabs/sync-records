@@ -103,7 +103,7 @@
               (proof ,((standard 'serialize) (obj)
                        `(lambda (node)
                           (let recurse ((node node))
-                            (if (not (and (sync-node? node) (sync-pair? node))) node
+                            (if (not (and (sync-node? node) (sync-pair? node))) (sync-cut node)
                                 (sync-cons (recurse (sync-car node)) (recurse (sync-cdr node)))))))))))))
 
   (define (pin! self path)
