@@ -82,7 +82,8 @@
     ;;     index (integer): index to access.
     ;;   Returns:
     ;;     byte-vector: digest.
-    (sync-digest (((self 'previous) index))))
+    (let ((index ((self '~adjust) index)))
+      (sync-digest ((self '~previous) index))))
 
   (define (push! self data)
     ;; Append data to the chain.
@@ -195,6 +196,35 @@
           (let ((data (sync-car node)) (rest (sync-cdr node)))
             (if (<= d depth) (sync-cons data (loop rest (+ depth 1)))
                 (sync-cons (sync-cut data) (loop rest (- d 1))))))))
+
+  (define (~previous self index)
+    ;; Helper method to calculate previous state.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;   Returns:
+    ;;     sync-node: previous state.
+    (let* ((size ((self 'size)))
+           (height-1 ((self '~range) 0 size))
+           (height-2 ((self '~range) 0 (+ index 1))))
+      (let loop ((node (self '(1 1))) (depth-1 1) (depth-2 1))
+        (let* ((domain-1 ((self '~domain) depth-1 size))
+               (domain-2 ((self '~domain) depth-2 (+ index 1))))
+          (cond ((not domain-1) (sync-null))
+                ((and (equal? domain-1 domain-2) (= (- height-1 depth-1) (- height-2 depth-2))) node)
+                ((equal? domain-1 domain-2)
+                 (sync-cons (sync-car node) (loop (sync-cdr node) (+ depth-1 1) (+ depth-2 1))))
+                ((> (car domain-1) (car domain-2)) (loop (sync-cdr node) (+ depth-1 1) depth-2))
+                ((<= (cadr domain-1) (car domain-2)) (loop node depth-1 (+ depth-2 1)))
+                (else (let recurse ((node (sync-car node)) (start (car domain-1)) (end (cadr domain-1))
+                                    (rest (loop (sync-cdr node) (+ depth-1 1) (- depth-2 1))))
+                        (let ((depth-start ((self '~range) start (+ index 1)))
+                              (depth-end ((self '~range) (- end 1) (+ index 1)))
+                              (mid (/ (+ start end) 2)))
+                          (cond ((not depth-start) rest)
+                                ((equal? depth-start depth-end) (sync-cons node rest))
+                                ((>= mid (cadr domain-2)) (recurse (sync-car node) start mid rest))
+                                (else (recurse (sync-cdr node) mid end
+                                               (recurse (sync-car node) start mid rest))))))))))))
 
   (define* (~range self index (size ((self 'size))))
     ;; Compute level range for index in log tree.
