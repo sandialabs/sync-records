@@ -279,15 +279,21 @@
     ;;   Args:
     ;;     path (list of keys): path segments.
     ;;   Returns:
-    ;;     any: value, '(nothing), '(unknown), or '(directory keys known?).
+    ;;     any: value, '(nothing), '(unknown), or '(directory ((key type) ...) known?).
     (let ((path (map (self '~key->bytes) path)))
       (let ((obj ((self 'node->obj) ((self '~r-read) path))))
         (if (sync-node? obj)
             (cond ((sync-null? obj) '(nothing))
                   ((sync-stub? obj) '(unknown))
-                  (else
-                   (let ((all ((self '~dir-all) obj)))
-                     `(directory ,(map (self '~bytes->key) (car all)) ,(cadr all)))))
+                  (else (let ((all ((self '~dir-all) obj)))
+                          `(directory ,(map (lambda (k)
+                                              `(,((self '~bytes->key) k)
+                                                ,(let ((child ((self '~dir-get) obj k)))
+                                                   (cond (((self '~struct?) child) 'object)
+                                                         ((sync-node? child) (if (sync-stub? child) 'unknown 'directory))
+                                                         (else 'value)))))
+                                            (car all))
+                                      ,(cadr all)))))
             (cond ((procedure? obj) (obj))
                   (else obj))))))
 

@@ -51,7 +51,7 @@
              (journal (tree-1) ((tree-1 'set!) '(a e) '(nothing)) #t)
 
              ;; getting
-             (journal (tree-1) ((tree-1 'get) '(a)) '(directory (c c* b) #t))
+             (journal (tree-1) ((tree-1 'get) '(a)) '(directory ((c directory) (c* directory) (b value)) #t))
              (journal (tree-1) ((tree-1 'get) '(a b)) 2)
              (journal (tree-1) ((tree-1 'get) '(a c d)) 4)
              (journal (tree-1) ((tree-1 'get) '(a c* d)) 4)
@@ -65,10 +65,10 @@
              (journal (tree-1) ((tree-1 'get) '(a* c d)) 4)
 
              ;; slicing
-             (journal (tree-1) ((tree-1 'get) '(a)) '(directory (c c* b) #t))
+             (journal (tree-1) ((tree-1 'get) '(a)) '(directory ((c directory) (c* directory) (b value)) #t))
              (journal (tree-1) ((tree-1 'slice!) '(a b)) #t)
              (journal (tree-1) ((tree-1 'get) '(a b)) 2)
-             (journal (tree-1) ((tree-1 'get) '(a)) '(directory (b) #f))
+             (journal (tree-1) ((tree-1 'get) '(a)) '(directory ((b value)) #f))
 
              ;; pruning
              (journal (tree-1) ((tree-1 'set!) '(b a c d) 4) #t)
@@ -78,7 +78,7 @@
              (journal (tree-1) ((tree-1 'copy!) '(b) '(b*)) #t)
              (journal (tree-1) ((tree-1 'prune!) '(b d d) #t) #t)
              (journal (tree-1) ((tree-1 'prune!) '(b d e)) #t)
-             (journal (tree-1) ((tree-1 'get) '(b d)) '(directory (d) #f))
+             (journal (tree-1) ((tree-1 'get) '(b d)) '(directory ((d unknown)) #f))
              (journal (tree-1) ((tree-1 'get) '(b d d)) '(unknown))
              (journal (tree-1) ((tree-1 'get) '(b n c d)) 1)
 
@@ -98,5 +98,4 @@
              (journal (tree-3) ((tree-3 'prune!) '(a* b)) #t)
              (journal (tree-2 tree-3) ((tree-2 'merge!) tree-3) #t)
              (journal (tree-2) ((tree-2 'get) '(a b)) 2)
-             (journal (tree-2) ((tree-2 'get) '(a* b)) 4)
-             ))))))
+             (journal (tree-2) ((tree-2 'get) '(a* b)) 4)))))))
