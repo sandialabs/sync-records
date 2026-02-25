@@ -1,11 +1,20 @@
 (define-class (configuration)
-  ;; Store configuration-type information in a single lisp expression in the data field
-  ;; - The empty list () is both the default option for no return and the signal to delete a field
+  ;; Configuration class stores nested config data as a single expression.
 
   (define* (*init* self (config '()))
+    ;; Initialize configuration with optional expression.
+    ;;   Args:
+    ;;     config (list/expression): configuration expression.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
     (set! (self '(1)) (expression->byte-vector config)))
 
   (define (get self path)
+    ;; Get value at nested path.
+    ;;   Args:
+    ;;     path (list of symbols): path segments.
+    ;;   Returns:
+    ;;     any: value or '() when missing.
     (let loop ((config (byte-vector->expression (self '(1)))) (path path))
       (if (null? path) config
           (let ((match (assoc (car path) config)))
@@ -13,6 +22,12 @@
                 (loop (cadr match) (cdr path)))))))
 
   (define (set! self path value)
+    ;; Set or delete value at nested path (value '() deletes).
+    ;;   Args:
+    ;;     path (list of symbols): path segments.
+    ;;     value (any): value to set.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
     (set! (self '(1))
           (expression->byte-vector
            (let loop-1 ((config (byte-vector->expression (self '(1)))) (path path))

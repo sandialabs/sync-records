@@ -1,17 +1,34 @@
 (define-class (log-chain)
+  ;; Log-chain class stores items in a log-structured tree for efficient proofs.
 
   (define (*init* self)
+    ;; Initialize empty log-chain with size 0 and null chain.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
     (let ((size-node (expression->byte-vector 0))
           (chain-node (sync-null)))
       (set! (self '(1)) (sync-cons size-node chain-node))))
 
   (define (size self)
+    ;; Return number of elements in the chain.
+    ;;   Returns:
+    ;;     integer: chain size.
     (byte-vector->expression (self '(1 0))))
 
   (define (index self index~)
+    ;; Normalize index with bounds checking.
+    ;;   Args:
+    ;;     index~ (integer): index to normalize.
+    ;;   Returns:
+    ;;     integer: normalized index.
     ((self '~adjust) index~))
 
   (define (get self index)
+    ;; Get element at index.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;   Returns:
+    ;;     sync node: element at index.
     (let* ((size ((self 'size)))
            (index ((self '~adjust) index size))
            (level ((self '~range) index size))
@@ -28,6 +45,11 @@
             (loop-1 (sync-cdr node) (+ depth 1))))))
 
   (define (previous self index)
+    ;; Build a proof chain ending at index.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;   Returns:
+    ;;     chain object: proof chain with header.
     (let* ((size ((self 'size)))
            (index ((self '~adjust) index size))
            (height-1 ((self '~range) 0 size))
@@ -55,9 +77,19 @@
        (sync-cons (self '(0)) (sync-cons (expression->byte-vector (+ index 1)) main)))))
 
   (define* (digest self (index (- ((self 'size)) 1)))
+    ;; Digest of proof chain at index.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;   Returns:
+    ;;     byte-vector: digest.
     (sync-digest (((self 'previous) index))))
 
   (define (push! self data)
+    ;; Append data to the chain.
+    ;;   Args:
+    ;;     data (sync node): element to append.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
     (let* ((size ((self 'size)))
            (chain (let loop ((node (self '(1 1))) (depth 1) (new data))
                     (if (sync-null? node) (sync-cons new (sync-null))
@@ -69,6 +101,12 @@
       (set! (self '(1)) (sync-cons (expression->byte-vector (+ size 1)) chain))))
 
   (define (set! self index data)
+    ;; Replace element at index.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;     data (sync node): replacement element.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
     (let* ((size ((self 'size)))
            (index ((self '~adjust) index size))
            (level ((self '~range) index size))
@@ -91,6 +129,11 @@
                   (sync-cons (sync-car node) (loop-1 (sync-cdr node) (+ depth 1))))))))
 
   (define (slice! self index)
+    ;; Slice chain to reveal proof for index.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
     (let* ((size ((self 'size)))
            (index ((self '~adjust) index size))
            (level ((self '~range) index size))
@@ -113,6 +156,11 @@
                   (sync-cons (sync-cut (sync-car node)) (loop-1 (sync-cdr node) (+ depth 1))))))))
 
   (define (prune! self index)
+    ;; Prune chain to hide proof for index.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
     (let* ((size ((self 'size)))
            (index ((self '~adjust) index size))
            (level ((self '~range) index size))
@@ -137,6 +185,11 @@
                   (sync-cons (sync-car node) (loop-1 (sync-cdr node) (+ depth 1))))))))
 
   (define* (digest self (index (- ((self 'size)) 1)))
+    ;; Digest of proof chain at index.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;   Returns:
+    ;;     byte-vector: digest.
     (let* ((size ((self 'size)))
            (index ((self '~adjust) index size))
            (height-1 ((self '~range) 0 size))
@@ -163,6 +216,11 @@
                                                 (recurse (sync-car node) start mid rest)))))))))))))
 
   (define (truncate! self depth)
+    ;; Truncate proof tree depth by cutting deeper nodes.
+    ;;   Args:
+    ;;     depth (integer): max depth to keep.
+    ;;   Returns:
+    ;;     sync node: truncated proof tree.
     (let loop ((node (self '(1 1))) (d 0)) 
       (if (sync-null? node) node
           (let ((data (sync-car node)) (rest (sync-cdr node)))
@@ -170,6 +228,12 @@
                 (sync-cons (sync-cut data) (loop rest (- d 1))))))))
 
   (define* (~range self index (size ((self 'size))))
+    ;; Compute level range for index in log tree.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;     size (integer): chain size.
+    ;;   Returns:
+    ;;     integer: level or #f.
     (let* ((bits (lambda (x) (let loop ((i x) (b 0)) (if (<= i 0) b (loop (ash i -1) (+ b 1))))))
            (diff (+ (- size index) 1))
            (mask (- (ash 1 (- (bits diff) 1)) 1)))
@@ -177,11 +241,23 @@
           (- (bits (+ diff (logand index mask))) 1))))
 
   (define* (~domain self depth (size ((self 'size))))
+    ;; Compute index domain bounds for a given depth.
+    ;;   Args:
+    ;;     depth (integer): tree depth.
+    ;;     size (integer): chain size.
+    ;;   Returns:
+    ;;     list: (start end) or #f.
     (if (< size (- (expt 2 depth) 1)) #f
         `(,(- size (- (expt 2 depth) 1) (modulo (+ size 1) (expt 2 depth)))
           ,(- size (- (expt 2 (- depth 1)) 1) (modulo (+ size 1) (expt 2 (- depth 1)))))))
 
   (define* (~adjust self index (size ((self 'size))))
+    ;; Normalize index into [0,size) or raise.
+    ;;   Args:
+    ;;     index (integer): index to normalize.
+    ;;     size (integer): chain size.
+    ;;   Returns:
+    ;;     integer: normalized index.
     (let ((index (if (< index 0) (+ size index) index)))
       (if (and (>= index 0) (< index size)) index
           (error 'index-error "Index is out of bounds")))))

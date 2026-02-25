@@ -2,8 +2,15 @@
 
   (define src
     `(define-class (standard)
+       ;; Standard class builds and manipulates sync objects generically.
 
        (define* (make self class (init ()))
+         ;; Instantiate a class from a define-class form.
+         ;;   Args:
+         ;;     class (list): define-class form.
+         ;;     init (list of args): constructor args.
+         ;;   Returns:
+         ;;     object: instance.
          (if (not (eq? (car class) 'define-class))
              (error 'make-error "Please load in a class definition"))
 
@@ -63,24 +70,53 @@
            object))
 
        (define (dump self object)
+         ;; Return raw node representation of object.
+         ;;   Args:
+         ;;     object (object): target object.
+         ;;   Returns:
+         ;;     sync node: raw node.
          (object))
 
        (define (load self node)
+         ;; Load an object from a serialized sync node.
+         ;;   Args:
+         ;;     node (sync node): serialized node.
+         ;;   Returns:
+         ;;     object: instance.
          ((eval (byte-vector->expression (sync-car node))) node))
 
        (define (deep-get self object path)
+         ;; Get value at path across nested objects.
+         ;;   Args:
+         ;;     object (object): target object.
+         ;;     path (list): path segments.
+         ;;   Returns:
+         ;;     any: value or nested object.
          (if (null? path) object
              (let ((node ((object 'get) (car path))))
                (if (not (sync-node? node)) ((self 'deep-get) node (cdr path))
                    ((self 'deep-get) ((self 'load) node) (cdr path))))))
 
        (define (deep-set! self object path value)
+         ;; Set value at path across nested objects.
+         ;;   Args:
+         ;;     object (object): target object.
+         ;;     path (list): path segments.
+         ;;     value (any): value to set.
+         ;;   Returns:
+         ;;     boolean: #t after mutation.
          (if (= (length path) 1) ((object 'set!) (car path) value)
              (let ((child ((self 'load) ((object 'get) (car path)))))
                ((self 'deep-set!) child (cdr path) value)
                ((object 'set!) (car path) ((self 'dump) child)))))
 
        (define (deep-slice! self object path)
+         ;; Slice object to retain proof along path.
+         ;;   Args:
+         ;;     object (object): target object.
+         ;;     path (list): path segments.
+         ;;   Returns:
+         ;;     boolean: #t after mutation.
          (if (= (length path) 1) ((object 'slice!) (car path))
              (let* ((child ((self 'load) ((object 'get) (car path))))
                     (digest (sync-digest ((self 'dump) child))))
@@ -91,6 +127,12 @@
                ((object 'slice!) (car path)))))
 
        (define (deep-prune! self object path)
+         ;; Prune object to remove proof along path.
+         ;;   Args:
+         ;;     object (object): target object.
+         ;;     path (list): path segments.
+         ;;   Returns:
+         ;;     boolean: #t after mutation.
          (if (= (length path) 1)
              ((object 'prune!) (car path))
              (let ((result ((object 'get) (car path))))
@@ -105,6 +147,12 @@
                          ((object 'set!) (car path) ((self 'dump) child))))))))
 
        (define (deep-merge! self object-source object-target)
+         ;; Merge equivalent objects by digest.
+         ;;   Args:
+         ;;     object-source (object): source object.
+         ;;     object-target (object): target object.
+         ;;   Returns:
+         ;;     boolean: #t after mutation.
          (if (not (equal? (sync-digest ((self 'dump) object-source)) (sync-digest ((self 'dump) object-target))))
              (error 'node-error "Cannot merge non-equivalent objects")
              (set! (object-target '(1))
@@ -117,16 +165,36 @@
                                       (recurse (sync-cdr node-1) (sync-cdr node-2)))))))))
 
        (define (deep-copy! self object path-source path-target)
+         ;; Copy value from source path to target path.
+         ;;   Args:
+         ;;     object (object): target object.
+         ;;     path-source (list): source path.
+         ;;     path-target (list): target path.
+         ;;   Returns:
+         ;;     boolean: #t after mutation.
          (let ((value ((self 'deep-get) object path-source)))
            ((self 'deep-set!) object path-target (if (procedure? value) ((self 'dump) value) value))))
 
        (define (deep-call! self object path function)
+         ;; Call function on object at path and store result.
+         ;;   Args:
+         ;;     object (object): target object.
+         ;;     path (list): path segments.
+         ;;     function (procedure): callback to run.
+         ;;   Returns:
+         ;;     any: result of function.
          (if (null? path) (function object)
              (let* ((child ((self 'load) ((object 'get) (car path))))
                     (result ((self 'deep-call!) child (cdr path) function)))
                ((object 'set!) (car path) ((self 'dump) child)) result)))
 
        (define (serialize self node query)
+         ;; Serialize node with a traversal query into compact form.
+         ;;   Args:
+         ;;     node (sync node): root node.
+         ;;     query (procedure): traversal callback.
+         ;;   Returns:
+         ;;     list: serialization list.
          (let* ((ls '())
                 (tab (hash-table))
                 (add (lambda (x y z)
@@ -178,6 +246,11 @@
            (map (lambda (x) (compact (map shorten x))) ls)))
 
        (define (deserialize self serialization)
+         ;; Deserialize a serialization list into a sync node.
+         ;;   Args:
+         ;;     serialization (list): serialization list.
+         ;;   Returns:
+         ;;     sync node: deserialized node.
          (let* ((proc (lambda (x)
                         (let ((k (car x)) (v (cadr x)))
                           (case (car v)
@@ -191,7 +264,6 @@
   `(lambda (root)
 
      (define (self-make class)
-       ;; Use standard class make function to build itself"
        (let* ((function (let loop ((body class))
                           (let ((item (car body)))
                             (if (and (pair? item) (eq? (car item) 'define*) (eq? (caadr item) 'make))

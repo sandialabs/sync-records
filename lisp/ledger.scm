@@ -1,5 +1,12 @@
 (define-class (ledger)
+  ;; Ledger class manages config, staged state, and signed/pinned chain history.
   (define* (~field self name value)
+    ;; Resolve or set internal field by name.
+    ;;   Args:
+    ;;     name (symbol): field name.
+    ;;     value (optional procedure returning value or #f): thunk to store, or #f to read.
+    ;;   Returns:
+    ;;     any: field value when value is #f, otherwise #t after set.
     (let ((address (case name
                      ((standard) '(1 0 0 0))
                      ((config) '(1 0 0 1))
@@ -12,6 +19,12 @@
             ((eval (byte-vector->expression (sync-car node))) node)))))
 
   (define* (~path-check self path peer-okay?)
+    ;; Validate a state/peer path shape before access.
+    ;;   Args:
+    ;;     path (list): path segments.
+    ;;     peer-okay? (boolean): allow *peer* paths.
+    ;;   Returns:
+    ;;     boolean: #t when valid (or raises on invalid path).
     (cond ((not (list? (car path)))
            (error 'path-error "Expected a list in the next path element"))
           ((and (not peer-okay?) (eq? (caar path) '*peer*))
@@ -21,6 +34,11 @@
           (else #t)))
 
   (define (~signature-sign! self chain)
+    ;; Embed public key and signature into chain head using config keys.
+    ;;   Args:
+    ;;     chain (chain object): chain to sign.
+    ;;   Returns:
+    ;;     boolean: #t after mutating chain.
     (let* ((config ((self '~field) 'config))
            (standard ((self '~field) 'standard))
            (public-key ((config 'get) '(public public-key)))
@@ -33,6 +51,12 @@
          ((tree 'set!) '(*crypto* signature) (crypto-sign secret-key (sync-digest (chain))))))))
 
   (define (~signature-verify self chain public-key)
+    ;; Verify chain head signature and optional expected public key.
+    ;;   Args:
+    ;;     chain (chain object): chain to verify.
+    ;;     public-key (byte-vector or #f): expected public key.
+    ;;   Returns:
+    ;;     boolean: #t when signature verifies (or raises on failure).
     (let* ((config ((self '~field) 'config))
            (standard ((self '~field) 'standard))
            (chain-copy ((standard 'load) (chain))))
@@ -51,6 +75,12 @@
                  (else #t)))))))
 
   (define (*init* self standard config)
+    ;; Initialize ledger with a standard API and configuration object.
+    ;;   Args:
+    ;;     standard (standard class object): standard helper instance.
+    ;;     config (configuration object): configuration expression.
+    ;;   Returns:
+    ;;     boolean: #t after setting fields.
     (let ((tree-class ((config 'get) '(private tree-class)))
           (chain-class ((config 'get) '(private chain-class))))
       ((self '~field) 'standard standard)
@@ -60,16 +90,31 @@
       ((self '~field) 'perm ((standard 'make) chain-class))))
 
   (define (configuration self)
+    ;; Return full configuration data (private and public).
+    ;;   Returns:
+    ;;     list: configuration expression.
     (((self '~field) 'config) 'get) '())
 
   (define (information self)
+    ;; Return public configuration information only.
+    ;;   Returns:
+    ;;     list: public configuration expression.
     ((((self '~field) 'config) 'get) '(public)))
 
   (define* (size self)
+    ;; Size of the permanent chain.
+    ;;   Returns:
+    ;;     integer: chain size.
     (let ((perm ((self '~field) 'perm)))
       ((perm 'size))))
 
   (define (peer! self name info)
+    ;; Register peer info and cache their public key.
+    ;;   Args:
+    ;;     name (symbol): peer name.
+    ;;     info (alist or expression with `information`): peer info.
+    ;;   Returns:
+    ;;     boolean: #t after updating config.
     ;; todo: reach out and ask peer for public key (maybe? need a "config" endpoint)
     (let ((config ((self '~field) 'config)))
       ((config 'set!) `(private peer ,name) info)
@@ -78,10 +123,19 @@
       ((self '~field) 'config config)))
 
   (define (peers self)
+    ;; List known peer names.
+    ;;   Returns:
+    ;;     list: peer names.
     (let ((config ((self '~field) 'config)))
       (map car ((config 'get) '(private peer)))))
 
   (define (set! self path value)
+    ;; Stage a state change at path (not yet committed).
+    ;;   Args:
+    ;;     path (list): path segments.
+    ;;     value (any): value to set.
+    ;;   Returns:
+    ;;     boolean: #t after staging.
     ((self '~path-check) path)
     (let ((standard ((self '~field) 'standard))
           (stage ((self '~field) 'stage)))
@@ -89,6 +143,12 @@
       ((self '~field) 'stage stage)))
 
   (define* (get self path details?)
+    ;; Get value at path, optionally with proof details.
+    ;;   Args:
+    ;;     path (list): path segments.
+    ;;     details? (boolean): include proof details.
+    ;;   Returns:
+    ;;     any: value or association list with content/pinned?/proof.
     (let* ((standard ((self '~field) 'standard))
            (obj (if (integer? (car path)) ((self '~fetch) path)
                        (let ((stage ((self '~field) 'stage)))
@@ -107,6 +167,11 @@
                                 (sync-cons (recurse (sync-car node)) (recurse (sync-cdr node)))))))))))))
 
   (define (pin! self path)
+    ;; Pin a path into the permanent chain.
+    ;;   Args:
+    ;;     path (list): path segments.
+    ;;   Returns:
+    ;;     boolean: #t after pinning.
     ((self '~path-check) (cdr path) #t)
     (let* ((standard ((self '~field) 'standard))
            (perm ((self '~field) 'perm))
@@ -115,6 +180,11 @@
       ((self '~field) 'perm perm)))
 
   (define (unpin! self path)
+    ;; Remove pinned path from permanent chain.
+    ;;   Args:
+    ;;     path (list): path segments.
+    ;;   Returns:
+    ;;     boolean: #t after unpinning.
     ((self '~path-check) (cdr path) #t)
     (let* ((standard ((self '~field) 'standard))
            (perm ((self '~field) 'perm)))
@@ -122,6 +192,11 @@
       ((self '~field) 'perm perm)))
 
   (define* (synchronize self index)
+    ;; Serialize peer-visible chain digest at index for sync.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;   Returns:
+    ;;     list: serialization list.
     (let ((standard ((self '~field) 'standard))
           (perm ((self '~field) 'perm)))
       ((standard 'serialize) (perm)
@@ -135,6 +210,12 @@
                   ((chain 'digest) ,index))))))))
 
   (define (resolve self index path)
+    ;; Resolve a remote path against a serialized chain at index.
+    ;;   Args:
+    ;;     index (integer): index to access.
+    ;;     path (list): path segments.
+    ;;   Returns:
+    ;;     list: serialization list of the resolved object.
     ((self '~path-check) (cdr path) #t)
     (let ((standard ((self '~field) 'standard))
           (obj ((self '~fetch) path #t index)))
@@ -150,6 +231,11 @@
             (deep-get chain ',path))))))
   
   (define (step-peer! self name)
+    ;; Fetch and validate a peer chain head into stage.
+    ;;   Args:
+    ;;     name (symbol): peer name.
+    ;;   Returns:
+    ;;     boolean: #t when peer state updated, #f if peer missing.
     (let* ((config ((self '~field) 'config))
            (standard ((self '~field) 'standard))
            (perm ((self '~field) 'perm))
@@ -172,6 +258,9 @@
             ((self '~field) 'stage stage)))))
 
   (define (step-chain! self)
+    ;; Commit staged changes to permanent chain and update temp window.
+    ;;   Returns:
+    ;;     integer: new chain size.
     (let* ((config ((self '~field) 'config))
            (window ((config 'get) '(public window)))
            (standard ((self '~field) 'standard))
@@ -188,12 +277,22 @@
       ((perm 'size))))
 
   (define (step-generate self)
+    ;; Build a list of step calls (local chain then peers) for iteration.
+    ;;   Returns:
+    ;;     list: step expressions.
     (let ((config ((self '~field) 'config)))
       (let loop ((peers ((config 'get) '(private peer))) (steps '((step-chain!))))
         (if (null? peers) (reverse steps)
             (loop (cdr peers) (cons `(step-peer! ,(caar peers)) steps))))))
 
   (define* (~fetch self path slice? (index -1))
+    ;; Fetch chain node at path, optionally slicing and using remote resolution.
+    ;;   Args:
+    ;;     path (list): path segments.
+    ;;     slice? (boolean): whether to slice proof.
+    ;;     index (integer): chain index to use.
+    ;;   Returns:
+    ;;     chain object: chain object with requested path loaded.
     (let* ((config ((self '~field) 'config))
            (standard ((self '~field) 'standard))
            (perm ((self '~field) 'perm))
