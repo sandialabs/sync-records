@@ -319,4 +319,21 @@
                            ((standard 'deep-merge!) body head))))
                     (if slice? ((standard 'deep-slice!) chain path)) chain)))
             (begin
-              (if slice? ((standard 'deep-slice!) chain path)) chain))))))
+              (if slice? ((standard 'deep-slice!) chain path)) chain)))))
+
+  (define (*update* self class function)
+    ;; Update the class logic and return a new ledger object 
+    ;;   Args:
+    ;;     class (symbol): path segments.
+    ;;     function (procedure): function of form (lambda (obj) ... obj)
+    ;;   Returns:
+    ;;     ledger object: updated ledger object (or raises a case error)
+    (let ((clone ((eval (byte-vector->expression (self '(0)))) (self '()))))
+      (if (eq? class 'ledger) (function clone)
+          (case class
+            ((config) ((clone '~field) 'config (function ((clone '~field) 'config))))
+            ((tree) ((clone '~field) 'stage (function ((clone '~field) 'stage))))
+            ((chain) ((clone '~field) 'perm (function ((clone '~field) 'perm)))
+             ((clone '~field) 'perm (function ((clone '~field) 'perm))))
+            (else (error 'case-error "Unrecognized class update candidate"))))
+      clone)))
