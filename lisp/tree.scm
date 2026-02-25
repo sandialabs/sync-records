@@ -87,7 +87,6 @@
                       (sync-cut node)
                       (sync-cons left right))))))))
 
-  ;; todo: is this still necessary?
   (define (~dir-merge self node-1 node-2)
     (let recurse ((node-1 node-1) (node-2 node-2))
       (cond ((and (sync-stub? node-1) (sync-stub? node-2)) node-1)
@@ -177,18 +176,6 @@
           (else (error 'invalid-type "Invalid value type"))))
 
   (define (get self path)
-    "Retrieve the data at the specified path.
-
-         > path (list sym|vec): path from the tree root to data
-         < return (sym . (list exp)): list containing the type and value of the data
-             - 'object type indicates a simple lisp-serializable value
-             - 'structure type indicates a complex value represented by sync-pair?
-             - 'directory type indicates an intermediate directory node
-               - the second item is a list of known subpath segments
-               - the third item is a bool indicating whether the directory is complete
-                 (i.e., none of its underlying data has been pruned)
-             - 'nothing type indicates that no data is found at the path
-             - 'unknown type indicates the path has been cut"
     (let ((path (map (self '~key->bytes) path)))
       (let ((obj ((self 'node->obj) ((self '~r-read) path))))
         (if (sync-node? obj)
@@ -201,21 +188,10 @@
                   (else obj))))))
 
   (define (equal? self source path)
-    "Indicate whether two paths that contain identical data
-
-         > path (list sym|vec): path from the tree root to source data
-         > target (list sym|vec): path from the tree root to target data
-         < return (bool): if paths are equal then #t, otherwise #f"
     (let ((source (map (self '~key->bytes) source)) (path (map (self '~key->bytes) path)))
       (equal? ((self '~r-read) source) ((self '~r-read) path))))
 
   (define (equivalent? self source path)
-    "Indicate whether two paths point to data that was formed
-         from an identical originating data structure (before possible pruning)
-
-         > path (list sym|vec): path from the tree root to source data
-         > target (list sym|vec): path from the tree root to target data
-         < return (bool): if paths are equivalent then #t, otherwise #f"
     (let ((source (map (self '~key->bytes) source)) (path (map (self '~key->bytes) path)))
       (let ((val-1 ((self '~r-read) source)) (val-2 ((self '~r-read) path)))
         (cond ((and (byte-vector? val-1) (byte-vector? val-2))
@@ -225,15 +201,6 @@
               (else #f)))))
 
   (define (set! self path value)
-    "Write the value to the path. Recursively generate parent
-         directories if necessary. If necessary, force all parent directories
-         into a new underlayed form. If the value is #f, then delete the data
-         at the path and recursively delete empty parent directories as
-         necessary.
-
-         > path (list sym|vec): path from the tree root to the data
-         > value (exp|sync-pair): data to be stored at the path
-         < return (bool): boolean indicating success of the operation"
     (cond ((equal? value '(unknown))
            (error 'value-error "Value conflicts with key expression '(unknown)"))
           ((and (list? value) (not (null? value)) (eq? (car value) 'directory))
@@ -250,25 +217,10 @@
                   ((self '~r-write!) (map (self '~key->bytes) path) ((self 'obj->node) content))))))
 
   (define (copy! self source path)
-    "Copy data from the source path to the target path.
-         Recursively generate parent directories if necessary. If
-         necessary, force all parent directories into a new underlayed form. If
-         the value is #f, then delete the data at the path and recursively
-         delete empty parent directories as necessary.
-
-         > source (list sym|vec): path from the tree root to the source data
-         > path (list sym|vec): path from the tree root to the target data
-         < return (bool): boolean indicating success of the operation"
     (let ((source (map (self '~key->bytes) source)) (path (map (self '~key->bytes) path)))
       ((self '~r-write!) path ((self '~r-read) source))))
 
   (define* (prune! self path keep-key?)
-    "Prune specified data from a directory while maintaining the
-         original hashes. If executed on directory that has not been previously
-         pruned or sliced, then the directory becomes an overlayed directory.
-
-         > path (list sym|vec): path from the tree root to the target directory 
-         < return (bool): boolean indicating success of the operation"
     (let ((path (map (self '~key->bytes) path)))
       (set! (self '(1))
             (let loop ((node (self '(1))) (path path))
@@ -280,13 +232,6 @@
                                 ((self '~dir-prune) node (car path) keep-key?)))))))))
 
   (define (slice! self path)
-    "Prune all data from directory EXCEPT for the specified path
-         while maintaining the original hashes. If executed on directory that
-         has not been previously pruned or sliced, then the directory becomes
-         an overlayed directory.
-
-         > path (list sym|vec): path from the tree root to the target directory 
-         < return (bool): boolean indicating success of the operation"
     (let ((path (map (self '~key->bytes) path)))
       (set! (self '(1))
             (let loop ((node (self '(1))) (path path))
@@ -297,13 +242,7 @@
                             ((self '~dir-slice) ((self '~dir-set) node key (loop ((self '~dir-get) node key) (cdr path)))
                              key))))))))
 
-  ;; todo: is this still necessary?
   (define (merge! self other)
-    "Recursively combine data from two equivalent directories.
-
-         > source (list sym|vec): path from the tree root to the source directory 
-         > path (list sym|vec): path from the tree root to the target directory 
-         < return (bool): boolean indicating success of the operation"
     (let ((node-1 (self '(1))) (node-2 (other '(1))))
       (if (or (sync-null? node-1) (not (equal? (sync-digest node-1) (sync-digest node-2)))) #f
           (set! (self '(1))

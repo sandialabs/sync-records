@@ -170,7 +170,6 @@
                 (sync-cons (sync-cut data) (loop rest (- d 1))))))))
 
   (define* (~range self index (size ((self 'size))))
-    "Returns the depth and offset (within the level) of the specified element at the specified chain size"
     (let* ((bits (lambda (x) (let loop ((i x) (b 0)) (if (<= i 0) b (loop (ash i -1) (+ b 1))))))
            (diff (+ (- size index) 1))
            (mask (- (ash 1 (- (bits diff) 1)) 1)))
@@ -178,7 +177,6 @@
           (- (bits (+ diff (logand index mask))) 1))))
 
   (define* (~domain self depth (size ((self 'size))))
-    "Returns the starting index number indices to the end index at the given depth and path"
     (if (< size (- (expt 2 depth) 1)) #f
         `(,(- size (- (expt 2 depth) 1) (modulo (+ size 1) (expt 2 depth)))
           ,(- size (- (expt 2 (- depth 1)) 1) (modulo (+ size 1) (expt 2 (- depth 1)))))))

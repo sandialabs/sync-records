@@ -2,7 +2,6 @@
 
   (define src
     `(define-class (standard)
-       "This is the standard interface for functions"
 
        (define* (make self class (init ()))
          (if (not (eq? (car class) 'define-class))
@@ -192,7 +191,7 @@
   `(lambda (root)
 
      (define (self-make class)
-       "Use standard class make function to build itself"
+       ;; Use standard class make function to build itself"
        (let* ((function (let loop ((body class))
                           (let ((item (car body)))
                             (if (and (pair? item) (eq? (car item) 'define*) (eq? (caadr item) 'make))
