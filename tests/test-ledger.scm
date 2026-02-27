@@ -82,6 +82,7 @@
       (map query
            `((journal-1 ((ledger 'size)) 0)
              (journal-1 ((ledger '*step-all-test*)) '(1))
+             (journal-1 ((ledger 'get) '((*state*))) '(directory ((*time* value)) #t))
              (journal-1 ((ledger 'set!) '((*state* do pin this)) "yes") #t)
              (journal-1 ((ledger 'set!) '((*state* do pin that)) "yes") #t)
              (journal-1 ((ledger 'set!) '((*state* do not pin)) "no") #t)
