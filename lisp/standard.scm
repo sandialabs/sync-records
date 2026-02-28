@@ -258,16 +258,3 @@
            (expr `(begin (define n-0 (sync-null))
                          ,@(map proc (reverse serialization)))))
       (eval expr))))
-
-  `(lambda (root)
-
-     (define (self-make class)
-       (let* ((function (let loop ((body class))
-                          (let ((item (car body)))
-                            (if (and (pair? item) (eq? (car item) 'define*) (eq? (caadr item) 'make))
-                                (cons 'define* (cdr item))
-                                (loop (cdr body)))))))
-         ((eval function) #f class)))
-
-     ((root 'set!) ,class-path ((self-make ',src)))
-     ((root 'set!) ,object-path ((self-make ',src)))))
