@@ -65,7 +65,7 @@
                                                        ,@(map prep methods)
                                                        (else ,err))))))))
                 (object ((eval function) (sync-cons (expression->byte-vector function) (sync-null)))))
-           (if (member '*init* (object '*api*))
+           (if (and init (member '*init* (object '*api*)) init)
                (apply (object '*init*) init))
            object))
 
