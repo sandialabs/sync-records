@@ -1,265 +1,263 @@
-(macro* (class-path object-path (debug '()))
+(define-class (standard)
+  ;; Standard class builds and manipulates sync objects generically.
 
-  (define src
-    `(define-class (standard)
-       ;; Standard class builds and manipulates sync objects generically.
+  (define* (make self class (init ()) debug)
+    ;; Instantiate a class from a define-class form.
+    ;;   Args:
+    ;;     class (list): define-class form.
+    ;;     init (list of args): constructor args or #f to make without instantiation.
+    ;;     debug (boolean): #t to insert debugging print lines
+    ;;   Returns:
+    ;;     object: instance.
+    (if (not (eq? (car class) 'define-class))
+        (error 'make-error "Please load in a class definition"))
 
-       (define* (make self class (init ()))
-         ;; Instantiate a class from a define-class form.
-         ;;   Args:
-         ;;     class (list): define-class form.
-         ;;     init (list of args): constructor args.
-         ;;   Returns:
-         ;;     object: instance.
-         (if (not (eq? (car class) 'define-class))
-             (error 'make-error "Please load in a class definition"))
+    (let* ((name (caadr class))
+           (methods (let loop ((body (cddr class)) (methods '()))
+                      (cond ((null? body) (reverse methods))
+                            ((string? (car body)) (loop (cdr body) methods))
+                            (else (if (not (or (eq? (caar body) 'define) (eq? (caar body) 'define*)))
+                                      (error 'component-error
+                                             "Only 'define and 'define* expressions are allowed within define-class"))
+                                  (loop (cdr body)
+                                        (cons `(,(caadar body) (,(if (eq? (caar body) 'define) 'lambda 'lambda*)
+                                                                ,(cdadar body) ,@(cddar body))) methods))))))
+           (api (let ((proc (lambda (x) (append " " (symbol->string (car x))))))
+                  (substring (apply append (map proc methods)) 1)))
+           (description (append "--- Standard Class ---\n"
+                                "Name: " (symbol->string name) "\n"
+                                "Description: " (if (string? (caddr class)) (caddr class) "") "\n"
+                                "Functions: " api "\n"
+                                "-------------------------"))
+           (err '(error 'function-error (append "Function not recognized: " (symbol->string *function*))))
+           (common `(((*name*) ,name) ((*api*) '(*name* *api* *class* ,@(map car methods))) ((*class*) ,class)))
+           (debug-1 (if debug `((print ',name '-> `(,*function* ,args))) '()))
+           (debug-2 (if debug `((print ',name '<- `(,*function* ,args) `,res)) '()))
+           (prep (lambda (x) `((,(car x)) (lambda args ,@debug-1
+                                                  (let ((res (apply ,(cadr x) (cons self args))))
+                                                    ,@debug-2
+                                                    res)))))
+           (get '(lambda (path)
+                   (let loop ((node (self)) (path path))
+                     (if (null? path) node
+                         (if (zero? (car path))
+                             (loop (sync-car node) (cdr path))
+                             (loop (sync-cdr node) (cdr path)))))))
+           (set '(lambda*
+                  (arg-1 arg-2)
+                  (set! state
+                        (let loop ((node (self)) (path (if arg-2 arg-1 '())))
+                          (if (null? path) (if arg-2 arg-2 arg-1)
+                              (let ((node (if (sync-pair? node) node (sync-cons (sync-null) (sync-null)))))
+                                (if (zero? (car path))
+                                    (sync-cons (loop (sync-car node) (cdr path)) (sync-cdr node))
+                                    (sync-cons (sync-car node) (loop (sync-cdr node) (cdr path)))))))) #t))
+           (function `(lambda (state)
+                        (define* (self arg) ,description
+                          (set! (setter self) ,set)
+                          (cond ((not arg) state)
+                                ((list? arg) (,get arg))
+                                (else (with-let (sublet (rootlet) 'self self '*function* arg)
+                                                (case *function*
+                                                  ,@common
+                                                  ,@(map prep methods)
+                                                  (else ,err))))))))
+           (object ((eval function) (sync-cons (expression->byte-vector function) (sync-null)))))
+      (if (and init (member '*init* (object '*api*)) init)
+          (apply (object '*init*) init))
+      object))
 
-         (let* ((name (caadr class))
-                (methods (let loop ((body (cddr class)) (methods '()))
-                           (cond ((null? body) (reverse methods))
-                                 ((string? (car body)) (loop (cdr body) methods))
-                                 (else (if (not (or (eq? (caar body) 'define) (eq? (caar body) 'define*)))
-                                           (error 'component-error
-                                                  "Only 'define and 'define* expressions are allowed within define-class"))
-                                       (loop (cdr body)
-                                             (cons `(,(caadar body) (,(if (eq? (caar body) 'define) 'lambda 'lambda*)
-                                                                     ,(cdadar body) ,@(cddar body))) methods))))))
-                (api (let ((proc (lambda (x) (append " " (symbol->string (car x))))))
-                       (substring (apply append (map proc methods)) 1)))
-                (description (append "--- Standard Class ---\n"
-                                     "Name: " (symbol->string name) "\n"
-                                     "Description: " (if (string? (caddr class)) (caddr class) "") "\n"
-                                     "Functions: " api "\n"
-                                     "-------------------------"))
-                (err '(error 'function-error (append "Function not recognized: " (symbol->string *function*))))
-                (common `(((*name*) ,name) ((*api*) '(*name* *api* *class* ,@(map car methods))) ((*class*) ,class)))
-                (debug-1 (if (member name ',debug) `((print ',name '-> `(,*function* ,args))) '()))
-                (debug-2 (if (member name ',debug) `((print ',name '<- `(,*function* ,args) `,res)) '()))
-                (prep (lambda (x) `((,(car x)) (lambda args ,@debug-1
-                                                       (let ((res (apply ,(cadr x) (cons self args))))
-                                                         ,@debug-2
-                                                         res)))))
-                (get '(lambda (path)
-                        (let loop ((node (self)) (path path))
-                          (if (null? path) node
-                              (if (zero? (car path))
-                                  (loop (sync-car node) (cdr path))
-                                  (loop (sync-cdr node) (cdr path)))))))
-                (set '(lambda*
-                       (arg-1 arg-2)
-                       (set! state
-                             (let loop ((node (self)) (path (if arg-2 arg-1 '())))
-                                 (if (null? path) (if arg-2 arg-2 arg-1)
-                                     (let ((node (if (sync-pair? node) node (sync-cons (sync-null) (sync-null)))))
-                                       (if (zero? (car path))
-                                           (sync-cons (loop (sync-car node) (cdr path)) (sync-cdr node))
-                                           (sync-cons (sync-car node) (loop (sync-cdr node) (cdr path)))))))) #t))
-                (function `(lambda (state)
-                             (define* (self arg) ,description
-                               (set! (setter self) ,set)
-                               (cond ((not arg) state)
-                                     ((list? arg) (,get arg))
-                                     (else (with-let (sublet (rootlet) 'self self '*function* arg)
-                                                     (case *function*
-                                                       ,@common
-                                                       ,@(map prep methods)
-                                                       (else ,err))))))))
-                (object ((eval function) (sync-cons (expression->byte-vector function) (sync-null)))))
-           (if (and init (member '*init* (object '*api*)) init)
-               (apply (object '*init*) init))
-           object))
+  (define (dump self object)
+    ;; Return raw node representation of object.
+    ;;   Args:
+    ;;     object (object): target object.
+    ;;   Returns:
+    ;;     sync node: raw node.
+    (object))
 
-       (define (dump self object)
-         ;; Return raw node representation of object.
-         ;;   Args:
-         ;;     object (object): target object.
-         ;;   Returns:
-         ;;     sync node: raw node.
-         (object))
+  (define (load self node)
+    ;; Load an object from a serialized sync node.
+    ;;   Args:
+    ;;     node (sync node): serialized node.
+    ;;   Returns:
+    ;;     object: instance.
+    ((eval (byte-vector->expression (sync-car node))) node))
 
-       (define (load self node)
-         ;; Load an object from a serialized sync node.
-         ;;   Args:
-         ;;     node (sync node): serialized node.
-         ;;   Returns:
-         ;;     object: instance.
-         ((eval (byte-vector->expression (sync-car node))) node))
+  (define (deep-get self object path)
+    ;; Get value at path across nested objects.
+    ;;   Args:
+    ;;     object (object): target object.
+    ;;     path (list): path segments.
+    ;;   Returns:
+    ;;     any: value or nested object.
+    (if (null? path) object
+        (let ((node ((object 'get) (car path))))
+          (if (not (sync-node? node)) ((self 'deep-get) node (cdr path))
+              ((self 'deep-get) ((self 'load) node) (cdr path))))))
 
-       (define (deep-get self object path)
-         ;; Get value at path across nested objects.
-         ;;   Args:
-         ;;     object (object): target object.
-         ;;     path (list): path segments.
-         ;;   Returns:
-         ;;     any: value or nested object.
-         (if (null? path) object
-             (let ((node ((object 'get) (car path))))
-               (if (not (sync-node? node)) ((self 'deep-get) node (cdr path))
-                   ((self 'deep-get) ((self 'load) node) (cdr path))))))
+  (define (deep-set! self object path value)
+    ;; Set value at path across nested objects.
+    ;;   Args:
+    ;;     object (object): target object.
+    ;;     path (list): path segments.
+    ;;     value (any): value to set.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
+    (if (= (length path) 1) ((object 'set!) (car path) value)
+        (let ((child ((self 'load) ((object 'get) (car path)))))
+          ((self 'deep-set!) child (cdr path) value)
+          ((object 'set!) (car path) ((self 'dump) child)))))
 
-       (define (deep-set! self object path value)
-         ;; Set value at path across nested objects.
-         ;;   Args:
-         ;;     object (object): target object.
-         ;;     path (list): path segments.
-         ;;     value (any): value to set.
-         ;;   Returns:
-         ;;     boolean: #t after mutation.
-         (if (= (length path) 1) ((object 'set!) (car path) value)
-             (let ((child ((self 'load) ((object 'get) (car path)))))
-               ((self 'deep-set!) child (cdr path) value)
-               ((object 'set!) (car path) ((self 'dump) child)))))
+  (define (deep-slice! self object path)
+    ;; Slice object to retain proof along path.
+    ;;   Args:
+    ;;     object (object): target object.
+    ;;     path (list): path segments.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
+    (if (= (length path) 1) ((object 'slice!) (car path))
+        (let* ((child ((self 'load) ((object 'get) (car path))))
+               (digest (sync-digest ((self 'dump) child))))
+          ((self 'deep-slice!) child (cdr path))
+          (if (not (equal? (sync-digest ((self 'dump) child)) digest))
+              (error 'digest-error "Slice operation caused digest change"))
+          ((object 'set!) (car path) ((self 'dump) child))
+          ((object 'slice!) (car path)))))
 
-       (define (deep-slice! self object path)
-         ;; Slice object to retain proof along path.
-         ;;   Args:
-         ;;     object (object): target object.
-         ;;     path (list): path segments.
-         ;;   Returns:
-         ;;     boolean: #t after mutation.
-         (if (= (length path) 1) ((object 'slice!) (car path))
-             (let* ((child ((self 'load) ((object 'get) (car path))))
-                    (digest (sync-digest ((self 'dump) child))))
-               ((self 'deep-slice!) child (cdr path))
-               (if (not (equal? (sync-digest ((self 'dump) child)) digest))
-                   (error 'digest-error "Slice operation caused digest change"))
-               ((object 'set!) (car path) ((self 'dump) child))
-               ((object 'slice!) (car path)))))
+  (define (deep-prune! self object path)
+    ;; Prune object to remove proof along path.
+    ;;   Args:
+    ;;     object (object): target object.
+    ;;     path (list): path segments.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
+    (if (= (length path) 1)
+        ((object 'prune!) (car path))
+        (let ((result ((object 'get) (car path))))
+          (if (not (and (sync-node? result) (sync-pair? result))) #t
+              (let* ((child ((self 'load) result))
+                     (digest (sync-digest ((self 'dump) child))))
+                ((self 'deep-prune!) child (cdr path))
+                (if (not (equal? (sync-digest ((self 'dump) child)) digest))
+                    (error 'digest-error "Prune operation caused digest change"))
+                (if (sync-stub? ((self 'dump) child))
+                    ((object 'prune!) (car path))
+                    ((object 'set!) (car path) ((self 'dump) child))))))))
 
-       (define (deep-prune! self object path)
-         ;; Prune object to remove proof along path.
-         ;;   Args:
-         ;;     object (object): target object.
-         ;;     path (list): path segments.
-         ;;   Returns:
-         ;;     boolean: #t after mutation.
-         (if (= (length path) 1)
-             ((object 'prune!) (car path))
-             (let ((result ((object 'get) (car path))))
-               (if (not (and (sync-node? result) (sync-pair? result))) #t
-                   (let* ((child ((self 'load) result))
-                          (digest (sync-digest ((self 'dump) child))))
-                     ((self 'deep-prune!) child (cdr path))
-                     (if (not (equal? (sync-digest ((self 'dump) child)) digest))
-                         (error 'digest-error "Prune operation caused digest change"))
-                     (if (sync-stub? ((self 'dump) child))
-                         ((object 'prune!) (car path))
-                         ((object 'set!) (car path) ((self 'dump) child))))))))
+  (define (deep-merge! self object-source object-target)
+    ;; Merge equivalent objects by digest.
+    ;;   Args:
+    ;;     object-source (object): source object.
+    ;;     object-target (object): target object.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
+    (if (not (equal? (sync-digest ((self 'dump) object-source)) (sync-digest ((self 'dump) object-target))))
+        (error 'node-error "Cannot merge non-equivalent objects")
+        (set! (object-target '(1))
+              (let recurse ((node-1 (object-source '(1))) (node-2 (object-target '(1))))
+                (cond ((sync-null? node-1) node-1)
+                      ((byte-vector? node-1) node-1)
+                      ((sync-stub? node-1) node-2)
+                      ((sync-stub? node-2) node-1)
+                      (else (sync-cons (recurse (sync-car node-1) (sync-car node-2))
+                                       (recurse (sync-cdr node-1) (sync-cdr node-2)))))))))
 
-       (define (deep-merge! self object-source object-target)
-         ;; Merge equivalent objects by digest.
-         ;;   Args:
-         ;;     object-source (object): source object.
-         ;;     object-target (object): target object.
-         ;;   Returns:
-         ;;     boolean: #t after mutation.
-         (if (not (equal? (sync-digest ((self 'dump) object-source)) (sync-digest ((self 'dump) object-target))))
-             (error 'node-error "Cannot merge non-equivalent objects")
-             (set! (object-target '(1))
-                   (let recurse ((node-1 (object-source '(1))) (node-2 (object-target '(1))))
-                     (cond ((sync-null? node-1) node-1)
-                           ((byte-vector? node-1) node-1)
-                           ((sync-stub? node-1) node-2)
-                           ((sync-stub? node-2) node-1)
-                           (else (sync-cons (recurse (sync-car node-1) (sync-car node-2))
-                                      (recurse (sync-cdr node-1) (sync-cdr node-2)))))))))
+  (define (deep-copy! self object path-source path-target)
+    ;; Copy value from source path to target path.
+    ;;   Args:
+    ;;     object (object): target object.
+    ;;     path-source (list): source path.
+    ;;     path-target (list): target path.
+    ;;   Returns:
+    ;;     boolean: #t after mutation.
+    (let ((value ((self 'deep-get) object path-source)))
+      ((self 'deep-set!) object path-target (if (procedure? value) ((self 'dump) value) value))))
 
-       (define (deep-copy! self object path-source path-target)
-         ;; Copy value from source path to target path.
-         ;;   Args:
-         ;;     object (object): target object.
-         ;;     path-source (list): source path.
-         ;;     path-target (list): target path.
-         ;;   Returns:
-         ;;     boolean: #t after mutation.
-         (let ((value ((self 'deep-get) object path-source)))
-           ((self 'deep-set!) object path-target (if (procedure? value) ((self 'dump) value) value))))
+  (define (deep-call! self object path function)
+    ;; Call function on object at path and store result.
+    ;;   Args:
+    ;;     object (object): target object.
+    ;;     path (list): path segments.
+    ;;     function (procedure): callback to run.
+    ;;   Returns:
+    ;;     any: result of function.
+    (if (null? path) (function object)
+        (let* ((child ((self 'load) ((object 'get) (car path))))
+               (result ((self 'deep-call!) child (cdr path) function)))
+          ((object 'set!) (car path) ((self 'dump) child)) result)))
 
-       (define (deep-call! self object path function)
-         ;; Call function on object at path and store result.
-         ;;   Args:
-         ;;     object (object): target object.
-         ;;     path (list): path segments.
-         ;;     function (procedure): callback to run.
-         ;;   Returns:
-         ;;     any: result of function.
-         (if (null? path) (function object)
-             (let* ((child ((self 'load) ((object 'get) (car path))))
-                    (result ((self 'deep-call!) child (cdr path) function)))
-               ((object 'set!) (car path) ((self 'dump) child)) result)))
+  (define (serialize self node query)
+    ;; Serialize node with a traversal query into compact form.
+    ;;   Args:
+    ;;     node (sync node): root node.
+    ;;     query (procedure): traversal callback.
+    ;;   Returns:
+    ;;     list: serialization list.
+    (let* ((ls '())
+           (tab (hash-table))
+           (add (lambda (x y z)
+                  (let ((init (if (not (tab x)) (cons y z) (cons (if y y (car (tab x))) (if z z (cdr (tab x)))))))
+                    (set! (tab x) (cons (if y y (car init)) (if z z (cdr init)))))))
+           (~sync-cons (lambda (y z) (let ((x (sync-cons y z))) (add x y z) x)))
+           (~sync-car (lambda (x) (let ((y (sync-car x))) (add x y #f) y)))
+           (~sync-cdr (lambda (x) (let ((z (sync-cdr x))) (add x #f z) z)))
+           (~ (with-let (sublet (rootlet) '*query* query '*node* node
+                                'sync-cons ~sync-cons 'sync-car ~sync-car 'sync-cdr ~sync-cdr)
+                        (let ((rootlet curlet))
+                          ((eval *query*) *node*))))
+           (tree (let recurse ((node node))
+                   (let ((left (if (tab node) (car (tab node)) #f))
+                         (right (if (tab node) (cdr (tab node)) #f)))
+                     (sync-cons (cond ((not left) (sync-cut (sync-car node)))
+                                      ((not (sync-pair? left)) left)
+                                      (else (recurse left)))
+                                (cond ((not right) (sync-cut (sync-cdr node)))
+                                      ((not (sync-pair? right)) right)
+                                      (else (recurse right)))))))
+           (sym (lambda (x) (string->symbol (append "n-" x))))
+           (~ (let recurse ((node tree))
+                (let* ((tb (hash-table))
+                       (h (if (sync-node? node) (sync-digest node) (sync-hash node)))
+                       (id (sym (byte-vector->hex-string h))))
+                  (cond ((tb id) id)
+                        ((sync-null? node) id)
+                        ((byte-vector? node) (set! (tb id) #t)
+                         (set! ls (cons `(,id (c ,node)) ls)) id)
+                        ((sync-stub? node) (set! (tb id) #t)
+                         (set! ls (cons `(,id (s ,(sync-digest node))) ls)) id)
+                        (else (set! (tb id) #t)
+                              (set! ls (cons `(,id ,(recurse (sync-car node))
+                                                   ,(recurse (sync-cdr node))) ls)) id)))))
+           (counter 0)
+           (seen (hash-table))
+           (null (sym (byte-vector->hex-string (sync-digest (sync-null)))))
+           (shorten (lambda (x)
+                      (cond ((eq? x null) (sym "0"))
+                            ((not (symbol? x)) x)
+                            ((seen x) (seen x))
+                            (else (set! (seen x)
+                                        (sym (number->string
+                                              (set! counter (+ counter 1)))))))))
+           (compact (lambda (x)
+                      (if (= (length x) 2) x
+                          (list (car x) (list (cadr x) (caddr x)))))))
+      (map (lambda (x) (compact (map shorten x))) ls)))
 
-       (define (serialize self node query)
-         ;; Serialize node with a traversal query into compact form.
-         ;;   Args:
-         ;;     node (sync node): root node.
-         ;;     query (procedure): traversal callback.
-         ;;   Returns:
-         ;;     list: serialization list.
-         (let* ((ls '())
-                (tab (hash-table))
-                (add (lambda (x y z)
-                       (let ((init (if (not (tab x)) (cons y z) (cons (if y y (car (tab x))) (if z z (cdr (tab x)))))))
-                         (set! (tab x) (cons (if y y (car init)) (if z z (cdr init)))))))
-                (~sync-cons (lambda (y z) (let ((x (sync-cons y z))) (add x y z) x)))
-                (~sync-car (lambda (x) (let ((y (sync-car x))) (add x y #f) y)))
-                (~sync-cdr (lambda (x) (let ((z (sync-cdr x))) (add x #f z) z)))
-                (~ (with-let (sublet (rootlet) '*query* query '*node* node
-                                     'sync-cons ~sync-cons 'sync-car ~sync-car 'sync-cdr ~sync-cdr)
-                             (let ((rootlet curlet))
-                               ((eval *query*) *node*))))
-                (tree (let recurse ((node node))
-                        (let ((left (if (tab node) (car (tab node)) #f))
-                              (right (if (tab node) (cdr (tab node)) #f)))
-                          (sync-cons (cond ((not left) (sync-cut (sync-car node)))
-                                           ((not (sync-pair? left)) left)
-                                           (else (recurse left)))
-                                     (cond ((not right) (sync-cut (sync-cdr node)))
-                                           ((not (sync-pair? right)) right)
-                                           (else (recurse right)))))))
-                (sym (lambda (x) (string->symbol (append "n-" x))))
-                (~ (let recurse ((node tree))
-                     (let* ((tb (hash-table))
-                            (h (if (sync-node? node) (sync-digest node) (sync-hash node)))
-                            (id (sym (byte-vector->hex-string h))))
-                       (cond ((tb id) id)
-                             ((sync-null? node) id)
-                             ((byte-vector? node) (set! (tb id) #t)
-                              (set! ls (cons `(,id (c ,node)) ls)) id)
-                             ((sync-stub? node) (set! (tb id) #t)
-                              (set! ls (cons `(,id (s ,(sync-digest node))) ls)) id)
-                             (else (set! (tb id) #t)
-                                   (set! ls (cons `(,id ,(recurse (sync-car node))
-                                                        ,(recurse (sync-cdr node))) ls)) id)))))
-                (counter 0)
-                (seen (hash-table))
-                (null (sym (byte-vector->hex-string (sync-digest (sync-null)))))
-                (shorten (lambda (x)
-                           (cond ((eq? x null) (sym "0"))
-                                 ((not (symbol? x)) x)
-                                 ((seen x) (seen x))
-                                 (else (set! (seen x)
-                                             (sym (number->string
-                                                   (set! counter (+ counter 1)))))))))
-                (compact (lambda (x)
-                           (if (= (length x) 2) x
-                               (list (car x) (list (cadr x) (caddr x)))))))
-           (map (lambda (x) (compact (map shorten x))) ls)))
-
-       (define (deserialize self serialization)
-         ;; Deserialize a serialization list into a sync node.
-         ;;   Args:
-         ;;     serialization (list): serialization list.
-         ;;   Returns:
-         ;;     sync node: deserialized node.
-         (let* ((proc (lambda (x)
-                        (let ((k (car x)) (v (cadr x)))
-                          (case (car v)
-                            ((c) `(define ,k  ,(cadr v)))
-                            ((s) `(define ,k  ,(sync-stub (cadr v))))
-                            (else `(define ,k (sync-cons ,(car v) ,(cadr v))))))))
-                (expr `(begin (define n-0 (sync-null))
-                              ,@(map proc (reverse serialization)))))
-           (eval expr)))))
+  (define (deserialize self serialization)
+    ;; Deserialize a serialization list into a sync node.
+    ;;   Args:
+    ;;     serialization (list): serialization list.
+    ;;   Returns:
+    ;;     sync node: deserialized node.
+    (let* ((proc (lambda (x)
+                   (let ((k (car x)) (v (cadr x)))
+                     (case (car v)
+                       ((c) `(define ,k  ,(cadr v)))
+                       ((s) `(define ,k  ,(sync-stub (cadr v))))
+                       (else `(define ,k (sync-cons ,(car v) ,(cadr v))))))))
+           (expr `(begin (define n-0 (sync-null))
+                         ,@(map proc (reverse serialization)))))
+      (eval expr))))
 
   `(lambda (root)
 
