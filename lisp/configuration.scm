@@ -1,7 +1,7 @@
 (define-class (configuration)
   ;; Configuration class stores nested config data as a single expression.
 
-  (define* (*init* self (config '()))
+  (define-method (*init* self (config '()))
     ;; Initialize configuration with optional expression.
     ;;   Args:
     ;;     config (list/expression): configuration expression.
@@ -9,7 +9,7 @@
     ;;     boolean: #t after mutation.
     (set! (self '(1)) (expression->byte-vector config)))
 
-  (define (get self path)
+  (define-method (get self path)
     ;; Get value at nested path.
     ;;   Args:
     ;;     path (list of symbols): path segments.
@@ -21,7 +21,7 @@
             (if (not match) '()
                 (loop (cadr match) (cdr path)))))))
 
-  (define (set! self path value)
+  (define-method (set! self path value)
     ;; Set or delete value at nested path (value '() deletes).
     ;;   Args:
     ;;     path (list of symbols): path segments.

@@ -33,7 +33,12 @@
     (run-test
      (append
       (map init '(journal))
-      (map install `((journal (,standard-src '(control class standard) '(control object standard)) "Installed standard library")
+      (map install `((journal (lambda (root)
+                                ((root 'set!) '(control class standard) ',standard-src)
+                                ((root 'set!) '(control object standard)
+                                 (let ((init (caddr ',standard-src)))
+                                   (((eval `(lambda* ,(cddadr init) ,@(cddr init))) ',standard-src)))))
+                     "Installed standard library")
                      (journal (lambda (root) ((root 'set!) '(control class tree) ',tree-src)))))
       (map instantiate `((journal tree-1 (control class tree))
                          (journal tree-2 (control class tree))
@@ -63,6 +68,10 @@
              ;; copying
              (journal (tree-1) ((tree-1 'copy!) '(a) '(a*)) #t)
              (journal (tree-1) ((tree-1 'get) '(a* c d)) 4)
+             (journal (tree-1) ((tree-1 'set!) '(a fn) (lambda (x) x))
+                      (lambda (x) (and (list? x) (eq? (car x) 'error))))
+             (journal (tree-1) ((tree-1 'set!) '(a mac) (macro (x) x))
+                      (lambda (x) (and (list? x) (eq? (car x) 'error))))
 
              ;; slicing
              (journal (tree-1) ((tree-1 'get) '(a)) '(directory ((c directory) (c* directory) (b value)) #t))

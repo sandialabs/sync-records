@@ -7,6 +7,27 @@ fi
 
 sdk=$1
 
+run_case() {
+    name="$1"
+    expr="$2"
+
+    echo "--- $name ---"
+    output=$($sdk -e "$expr" 2>&1)
+    status=$?
+    echo "$output"
+
+    if [ "$status" -ne 0 ]; then
+        exit "$status"
+    fi
+
+    # Janky but effective: treat interpreter-level "(error ...)" output as test failure.
+    first_line=$(printf '%s\n' "$output" | sed -n '/./{p;q;}')
+    if [[ "$first_line" == "(error "* ]]; then
+        echo "FAIL: $name returned an error form."
+        exit 1
+    fi
+}
+
 run="(lambda (script)
   (let ((nodes (hash-table)))
     (let loop ((input script))
@@ -45,17 +66,12 @@ tree=$( cat ../lisp/tree.scm )
 config=$( cat ../lisp/configuration.scm )
 ledger=$( cat ../lisp/ledger.scm )
 
-echo "--- Control Test ---"
-$sdk -e "($( cat ./test-control.scm ) $run $messenger '$control)"
+run_case "Control Test" "($( cat ./test-control.scm ) $run $messenger '$control)"
 
-echo "--- Standards Test  ---"
-$sdk -e "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
+run_case "Standards Test" "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
 
-echo "--- Chain Test ---"
-$sdk -e "($( cat ./test-chain.scm ) $run $messenger '$control '$standard '$linear_chain '$log_chain)"
+run_case "Chain Test" "($( cat ./test-chain.scm ) $run $messenger '$control '$standard '$linear_chain '$log_chain)"
 
-echo "--- Tree Test ---"
-$sdk -e "($( cat ./test-tree.scm ) $run $messenger '$control '$standard '$tree)"
+run_case "Tree Test" "($( cat ./test-tree.scm ) $run $messenger '$control '$standard '$tree)"
 
-echo "--- Ledger Test ---"
-$sdk -e "($( cat ./test-ledger.scm ) $run $messenger '$control '$standard '$log_chain '$tree '$config '$ledger)"
+run_case "Ledger Test" "($( cat ./test-ledger.scm ) $run $messenger '$control '$standard '$log_chain '$tree '$config '$ledger)"

@@ -72,7 +72,11 @@
     (run-test
      (append
       (map init '(journal))
-      (map install `((journal (,standard-src '(control class standard) '(control object standard)))
+      (map install `((journal (lambda (root)
+                                ((root 'set!) '(control class standard) ',standard-src)
+                                ((root 'set!) '(control object standard)
+                                 (let ((init (caddr ',standard-src)))
+                                   (((eval `(lambda* ,(cddadr init) ,@(cddr init))) ',standard-src))))))
                      (journal (lambda (root) ((root 'set!) '(control class linear-chain) ',linear-chain-src)))
                      (journal (lambda (root) ((root 'set!) '(control class log-chain) ',log-chain-src)))))
       (queries 'linear-chain)

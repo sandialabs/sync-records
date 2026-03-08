@@ -1,7 +1,7 @@
 (define-class (standard)
   ;; Standard class builds and manipulates sync objects generically.
 
-  (define* (make self class (init ()) debug)
+  (define-method (make self class (init ()) debug)
     ;; Instantiate a class from a define-class form.
     ;;   Args:
     ;;     class (list): define-class form.
@@ -16,12 +16,11 @@
            (methods (let loop ((body (cddr class)) (methods '()))
                       (cond ((null? body) (reverse methods))
                             ((string? (car body)) (loop (cdr body) methods))
-                            (else (if (not (or (eq? (caar body) 'define) (eq? (caar body) 'define*)))
+                            (else (if (not (eq? (caar body) 'define-method))
                                       (error 'component-error
-                                             "Only 'define and 'define* expressions are allowed within define-class"))
+                                             "Only 'define-method expressions are allowed within define-class"))
                                   (loop (cdr body)
-                                        (cons `(,(caadar body) (,(if (eq? (caar body) 'define) 'lambda 'lambda*)
-                                                                ,(cdadar body) ,@(cddar body))) methods))))))
+                                        (cons `(,(caadar body) (lambda* ,(cdadar body) ,@(cddar body))) methods))))))
            (api (let ((proc (lambda (x) (append " " (symbol->string (car x))))))
                   (substring (apply append (map proc methods)) 1)))
            (description (append "--- Standard Class ---\n"
@@ -34,6 +33,7 @@
            (debug-1 (if debug `((print ',name '-> `(,*function* ,args))) '()))
            (debug-2 (if debug `((print ',name '<- `(,*function* ,args) `,res)) '()))
            (prep (lambda (x) `((,(car x)) (lambda args ,@debug-1
+                                                  ;; RIGHT HERE
                                                   (let ((res (apply ,(cadr x) (cons self args))))
                                                     ,@debug-2
                                                     res)))))
@@ -67,7 +67,7 @@
           (apply (object '*init*) init))
       object))
 
-  (define (dump self object)
+  (define-method (dump self object)
     ;; Return raw node representation of object.
     ;;   Args:
     ;;     object (object): target object.
@@ -75,7 +75,7 @@
     ;;     sync node: raw node.
     (object))
 
-  (define (load self node)
+  (define-method (load self node)
     ;; Load an object from a serialized sync node.
     ;;   Args:
     ;;     node (sync node): serialized node.
@@ -83,7 +83,7 @@
     ;;     object: instance.
     ((eval (byte-vector->expression (sync-car node))) node))
 
-  (define (deep-get self object path)
+  (define-method (deep-get self object path)
     ;; Get value at path across nested objects.
     ;;   Args:
     ;;     object (object): target object.
@@ -95,7 +95,7 @@
           (if (not (sync-node? node)) ((self 'deep-get) node (cdr path))
               ((self 'deep-get) ((self 'load) node) (cdr path))))))
 
-  (define (deep-set! self object path value)
+  (define-method (deep-set! self object path value)
     ;; Set value at path across nested objects.
     ;;   Args:
     ;;     object (object): target object.
@@ -108,7 +108,7 @@
           ((self 'deep-set!) child (cdr path) value)
           ((object 'set!) (car path) ((self 'dump) child)))))
 
-  (define (deep-slice! self object path)
+  (define-method (deep-slice! self object path)
     ;; Slice object to retain proof along path.
     ;;   Args:
     ;;     object (object): target object.
@@ -124,7 +124,7 @@
           ((object 'set!) (car path) ((self 'dump) child))
           ((object 'slice!) (car path)))))
 
-  (define (deep-prune! self object path)
+  (define-method (deep-prune! self object path)
     ;; Prune object to remove proof along path.
     ;;   Args:
     ;;     object (object): target object.
@@ -144,7 +144,7 @@
                     ((object 'prune!) (car path))
                     ((object 'set!) (car path) ((self 'dump) child))))))))
 
-  (define (deep-merge! self object-source object-target)
+  (define-method (deep-merge! self object-source object-target)
     ;; Merge equivalent objects by digest.
     ;;   Args:
     ;;     object-source (object): source object.
@@ -162,7 +162,7 @@
                       (else (sync-cons (recurse (sync-car node-1) (sync-car node-2))
                                        (recurse (sync-cdr node-1) (sync-cdr node-2)))))))))
 
-  (define (deep-copy! self object path-source path-target)
+  (define-method (deep-copy! self object path-source path-target)
     ;; Copy value from source path to target path.
     ;;   Args:
     ;;     object (object): target object.
@@ -173,7 +173,7 @@
     (let ((value ((self 'deep-get) object path-source)))
       ((self 'deep-set!) object path-target (if (procedure? value) ((self 'dump) value) value))))
 
-  (define (deep-call! self object path function)
+  (define-method (deep-call! self object path function)
     ;; Call function on object at path and store result.
     ;;   Args:
     ;;     object (object): target object.
@@ -186,7 +186,7 @@
                (result ((self 'deep-call!) child (cdr path) function)))
           ((object 'set!) (car path) ((self 'dump) child)) result)))
 
-  (define (serialize self node query)
+  (define-method (serialize self node query)
     ;; Serialize node with a traversal query into compact form.
     ;;   Args:
     ;;     node (sync node): root node.
@@ -243,7 +243,7 @@
                           (list (car x) (list (cadr x) (caddr x)))))))
       (map (lambda (x) (compact (map shorten x))) ls)))
 
-  (define (deserialize self serialization)
+  (define-method (deserialize self serialization)
     ;; Deserialize a serialization list into a sync node.
     ;;   Args:
     ;;     serialization (list): serialization list.

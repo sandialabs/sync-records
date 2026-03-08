@@ -1,7 +1,7 @@
 (define-class (log-chain)
   ;; Log-chain class stores items in a log-structured tree for efficient proofs.
 
-  (define (*init* self)
+  (define-method (*init* self)
     ;; Initialize empty log-chain with size 0 and null chain.
     ;;   Returns:
     ;;     boolean: #t after mutation.
@@ -9,13 +9,13 @@
           (chain-node (sync-null)))
       (set! (self '(1)) (sync-cons size-node chain-node))))
 
-  (define (size self)
+  (define-method (size self)
     ;; Return number of elements in the chain.
     ;;   Returns:
     ;;     integer: chain size.
     (byte-vector->expression (self '(1 0))))
 
-  (define (index self index~)
+  (define-method (index self index~)
     ;; Normalize index with bounds checking.
     ;;   Args:
     ;;     index~ (integer): index to normalize.
@@ -23,7 +23,7 @@
     ;;     integer: normalized index.
     ((self '~adjust) index~))
 
-  (define (get self index)
+  (define-method (get self index)
     ;; Get element at index.
     ;;   Args:
     ;;     index (integer): index to access.
@@ -44,7 +44,7 @@
                       (loop-2 (sync-cdr node) (- depth 1) (modulo offset (expt 2 (- depth 1)))))))
             (loop-1 (sync-cdr node) (+ depth 1))))))
 
-  (define (previous self index)
+  (define-method (previous self index)
     ;; Build a proof chain ending at index.
     ;;   Args:
     ;;     index (integer): index to access.
@@ -76,7 +76,7 @@
       ((eval (byte-vector->expression (self '(0))))
        (sync-cons (self '(0)) (sync-cons (expression->byte-vector (+ index 1)) main)))))
 
-  (define* (digest self (index (- ((self 'size)) 1)))
+  (define-method (digest self (index (- ((self 'size)) 1)))
     ;; Digest of proof chain at index.
     ;;   Args:
     ;;     index (integer): index to access.
@@ -85,7 +85,7 @@
     (let ((index ((self '~adjust) index)))
       (sync-digest ((self '~previous) index))))
 
-  (define (push! self data)
+  (define-method (push! self data)
     ;; Append data to the chain.
     ;;   Args:
     ;;     data (sync node): element to append.
@@ -101,7 +101,7 @@
                                 (else (sync-cons new (loop rest (+ depth 1) old)))))))))
       (set! (self '(1)) (sync-cons (expression->byte-vector (+ size 1)) chain))))
 
-  (define (set! self index data)
+  (define-method (set! self index data)
     ;; Replace element at index.
     ;;   Args:
     ;;     index (integer): index to access.
@@ -129,7 +129,7 @@
                              (sync-cdr node))
                   (sync-cons (sync-car node) (loop-1 (sync-cdr node) (+ depth 1))))))))
 
-  (define (slice! self index)
+  (define-method (slice! self index)
     ;; Slice chain to reveal proof for index.
     ;;   Args:
     ;;     index (integer): index to access.
@@ -156,7 +156,7 @@
                              (sync-cut (sync-cdr node)))
                   (sync-cons (sync-cut (sync-car node)) (loop-1 (sync-cdr node) (+ depth 1))))))))
 
-  (define (prune! self index)
+  (define-method (prune! self index)
     ;; Prune chain to hide proof for index.
     ;;   Args:
     ;;     index (integer): index to access.
@@ -185,7 +185,7 @@
                              (sync-cdr node))
                   (sync-cons (sync-car node) (loop-1 (sync-cdr node) (+ depth 1))))))))
 
-  (define (truncate! self depth)
+  (define-method (truncate! self depth)
     ;; Truncate proof tree depth by cutting deeper nodes.
     ;;   Args:
     ;;     depth (integer): max depth to keep.
@@ -197,7 +197,7 @@
             (if (<= d depth) (sync-cons data (loop rest (+ depth 1)))
                 (sync-cons (sync-cut data) (loop rest (- d 1))))))))
 
-  (define (~previous self index)
+  (define-method (~previous self index)
     ;; Helper method to calculate previous state.
     ;;   Args:
     ;;     index (integer): index to access.
@@ -226,7 +226,7 @@
                                 (else (recurse (sync-cdr node) mid end
                                                (recurse (sync-car node) start mid rest))))))))))))
 
-  (define* (~range self index (size ((self 'size))))
+  (define-method (~range self index (size ((self 'size))))
     ;; Compute level range for index in log tree.
     ;;   Args:
     ;;     index (integer): index to access.
@@ -239,7 +239,7 @@
       (if (>= index size) #f
           (- (bits (+ diff (logand index mask))) 1))))
 
-  (define* (~domain self depth (size ((self 'size))))
+  (define-method (~domain self depth (size ((self 'size))))
     ;; Compute index domain bounds for a given depth.
     ;;   Args:
     ;;     depth (integer): tree depth.
@@ -250,7 +250,7 @@
         `(,(- size (- (expt 2 depth) 1) (modulo (+ size 1) (expt 2 depth)))
           ,(- size (- (expt 2 (- depth 1)) 1) (modulo (+ size 1) (expt 2 (- depth 1)))))))
 
-  (define* (~adjust self index (size ((self 'size))))
+  (define-method (~adjust self index (size ((self 'size))))
     ;; Normalize index into [0,size) or raise.
     ;;   Args:
     ;;     index (integer): index to normalize.

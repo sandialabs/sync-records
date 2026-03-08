@@ -19,7 +19,7 @@
              (journal ((root 'set!) '(a e) '(nothing)) #t)
 
              ;; getting
-             (journal ((root 'get) '(a)) '(directory (c* c b)))
+             (journal ((root 'get) '(a)) '(directory ((c* directory) (c directory) (b value))))
              (journal ((root 'get) '(a b)) 2)
              (journal ((root 'get) '(a c d)) 4)
              (journal ((root 'get) '(a c* d)) 4)
@@ -31,6 +31,10 @@
              ;; copying
              (journal ((root 'copy!) '(a) '(a*)) #t)
              (journal ((root 'get) '(a* c d)) 4)
+             (journal ((root 'set!) '(a fn) (lambda (x) x))
+                      (lambda (x) (and (list? x) (eq? (car x) 'error))))
+             (journal ((root 'set!) '(a mac) (macro (x) x))
+                      (lambda (x) (and (list? x) (eq? (car x) 'error))))
 
              ;; objects
              (journal ((root 'set!) '(b) (sync-cons #u(0) #u(1))) #t)

@@ -1,6 +1,6 @@
 (define-class (ledger)
   ;; Ledger class manages config, staged state, and signed/pinned chain history.
-  (define* (~field self name value)
+  (define-method (~field self name value)
     ;; Resolve or set internal field by name.
     ;;   Args:
     ;;     name (symbol): field name.
@@ -18,7 +18,7 @@
           (let ((node (self address)))
             ((eval (byte-vector->expression (sync-car node))) node)))))
 
-  (define* (~path-check self path peer-okay?)
+  (define-method (~path-check self path peer-okay?)
     ;; Validate a state/peer path shape before access.
     ;;   Args:
     ;;     path (list): path segments.
@@ -33,7 +33,7 @@
            (error 'path-error "Expected the first element in the next path element to be '*state* or '*peer*"))
           (else #t)))
 
-  (define (~signature-sign! self chain)
+  (define-method (~signature-sign! self chain)
     ;; Embed public key and signature into chain head using config keys.
     ;;   Args:
     ;;     chain (chain object): chain to sign.
@@ -50,7 +50,7 @@
          ((tree 'set!) '(*crypto* public-key) public-key)
          ((tree 'set!) '(*crypto* signature) (crypto-sign secret-key (sync-digest (chain))))))))
 
-  (define (~signature-verify self chain public-key)
+  (define-method (~signature-verify self chain public-key)
     ;; Verify chain head signature and optional expected public key.
     ;;   Args:
     ;;     chain (chain object): chain to verify.
@@ -74,7 +74,7 @@
                   (error 'signature-error "Included signature does not verify"))
                  (else #t)))))))
 
-  (define (*init* self standard config)
+  (define-method (*init* self standard config)
     ;; Initialize ledger with a standard API and configuration object.
     ;;   Args:
     ;;     standard (standard class object): standard helper instance.
@@ -89,26 +89,26 @@
       ((self '~field) 'temp ((standard 'make) chain-class))
       ((self '~field) 'perm ((standard 'make) chain-class))))
 
-  (define (configuration self)
+  (define-method (configuration self)
     ;; Return full configuration data (private and public).
     ;;   Returns:
     ;;     list: configuration expression.
     (((self '~field) 'config) 'get) '())
 
-  (define (information self)
+  (define-method (information self)
     ;; Return public configuration information only.
     ;;   Returns:
     ;;     list: public configuration expression.
     ((((self '~field) 'config) 'get) '(public)))
 
-  (define* (size self)
+  (define-method (size self)
     ;; Size of the permanent chain.
     ;;   Returns:
     ;;     integer: chain size.
     (let ((perm ((self '~field) 'perm)))
       ((perm 'size))))
 
-  (define (peer! self name info)
+  (define-method (peer! self name info)
     ;; Register peer info and cache their public key.
     ;;   Args:
     ;;     name (symbol): peer name.
@@ -122,14 +122,14 @@
        (cadr (assoc 'public-key ((eval (cadr (assoc 'information info)))))))
       ((self '~field) 'config config)))
 
-  (define (peers self)
+  (define-method (peers self)
     ;; List known peer names.
     ;;   Returns:
     ;;     list: peer names.
     (let ((config ((self '~field) 'config)))
       (map car ((config 'get) '(private peer)))))
 
-  (define (set! self path value)
+  (define-method (set! self path value)
     ;; Stage a state change at path (not yet committed).
     ;;   Args:
     ;;     path (list): path segments.
@@ -142,7 +142,7 @@
       ((standard 'deep-set!) stage path value)
       ((self '~field) 'stage stage)))
 
-  (define* (get self path details?)
+  (define-method (get self path details?)
     ;; Get value at path, optionally with proof details.
     ;;   Args:
     ;;     path (list): path segments.
@@ -166,7 +166,7 @@
                             (if (not (and (sync-node? node) (sync-pair? node))) (sync-cut node)
                                 (sync-cons (recurse (sync-car node)) (recurse (sync-cdr node)))))))))))))
 
-  (define (pin! self path)
+  (define-method (pin! self path)
     ;; Pin a path into the permanent chain.
     ;;   Args:
     ;;     path (list): path segments.
@@ -179,7 +179,7 @@
       ((standard 'deep-merge!) obj perm)
       ((self '~field) 'perm perm)))
 
-  (define (unpin! self path)
+  (define-method (unpin! self path)
     ;; Remove pinned path from permanent chain.
     ;;   Args:
     ;;     path (list): path segments.
@@ -191,7 +191,7 @@
       ((standard 'deep-prune!) perm path)
       ((self '~field) 'perm perm)))
 
-  (define* (synchronize self index)
+  (define-method (synchronize self index)
     ;; Serialize peer-visible chain digest at index for sync.
     ;;   Args:
     ;;     index (integer): index to access.
@@ -209,7 +209,7 @@
                   ((tree 'get) '(*crypto* signature))
                   ((chain 'digest) ,index))))))))
 
-  (define (resolve self index path)
+  (define-method (resolve self index path)
     ;; Resolve a remote path against a serialized chain at index.
     ;;   Args:
     ;;     index (integer): index to access.
@@ -230,7 +230,7 @@
                                            (deep-get object (cdr path)))))))))
             (deep-get chain ',path))))))
   
-  (define (step-peer! self name)
+  (define-method (step-peer! self name)
     ;; Fetch and validate a peer chain head into stage.
     ;;   Args:
     ;;     name (symbol): peer name.
@@ -257,7 +257,7 @@
             ((stage 'set!) `(*peer* ,name chain) (latest))
             ((self '~field) 'stage stage)))))
 
-  (define (step-chain! self)
+  (define-method (step-chain! self)
     ;; Commit staged changes to permanent chain and update temp window.
     ;;   Returns:
     ;;     integer: new chain size.
@@ -267,7 +267,7 @@
            (stage ((self '~field) 'stage))
            (perm ((self '~field) 'perm))
            (temp ((self '~field) 'temp)))
-      ((stage 'set!) '(*state* *time*) (time-unix))
+      ((stage 'set!) '(*state* *time*) (system-time-unix))
       ((perm 'push!) (stage))
       ((self '~signature-sign!) perm)
       ((temp 'push!) ((perm 'get) -1))
@@ -279,7 +279,7 @@
       ((self 'pin!) '(-1 (*state* *time*)))
       ((perm 'size))))
 
-  (define (step-generate self)
+  (define-method (step-generate self)
     ;; Build a list of step calls (local chain then peers) for iteration.
     ;;   Returns:
     ;;     list: step expressions.
@@ -288,7 +288,7 @@
         (if (null? peers) (reverse steps)
             (loop (cdr peers) (cons `(step-peer! ,(caar peers)) steps))))))
 
-  (define* (~fetch self path slice? (index -1))
+  (define-method (~fetch self path slice? (index -1))
     ;; Fetch chain node at path, optionally slicing and using remote resolution.
     ;;   Args:
     ;;     path (list): path segments.
@@ -324,7 +324,7 @@
             (begin
               (if slice? ((standard 'deep-slice!) chain path)) chain)))))
 
-  (define (*update* self class function)
+  (define-method (*update* self class function)
     ;; Update the class logic and return a new ledger object 
     ;;   Args:
     ;;     class (symbol): path segments.
