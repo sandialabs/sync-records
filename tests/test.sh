@@ -1,6 +1,11 @@
 #!/bin/bash
+set -euo pipefail
 
-if [ -z $1 ]; then
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+LISP_DIR="$ROOT_DIR/lisp"
+
+if [ -z "${1:-}" ]; then
     echo "Please provide a path to a Journal SDK executable"
     exit 1
 fi
@@ -58,20 +63,20 @@ messenger="(lambda (journal)
               (begin (print result)
                      (error 'message-error \"Message returned an error\"))))))"
 
-control=$( cat ../lisp/control.scm )
-standard=$( cat ../lisp/standard.scm )
-linear_chain=$( cat ../lisp/linear-chain.scm )
-log_chain=$( cat ../lisp/log-chain.scm )
-tree=$( cat ../lisp/tree.scm )
-config=$( cat ../lisp/configuration.scm )
-ledger=$( cat ../lisp/ledger.scm )
+control=$( cat "$LISP_DIR/control.scm" )
+standard=$( cat "$LISP_DIR/standard.scm" )
+linear_chain=$( cat "$LISP_DIR/linear-chain.scm" )
+log_chain=$( cat "$LISP_DIR/log-chain.scm" )
+tree=$( cat "$LISP_DIR/tree.scm" )
+config=$( cat "$LISP_DIR/configuration.scm" )
+ledger=$( cat "$LISP_DIR/ledger.scm" )
 
-run_case "Control Test" "($( cat ./test-control.scm ) $run $messenger '$control)"
+run_case "Control Test" "($( cat "$SCRIPT_DIR/test-control.scm" ) $run $messenger '$control)"
 
-run_case "Standards Test" "($( cat ./test-standard.scm ) $run $messenger '$control '$standard)"
+run_case "Standards Test" "($( cat "$SCRIPT_DIR/test-standard.scm" ) $run $messenger '$control '$standard)"
 
-run_case "Chain Test" "($( cat ./test-chain.scm ) $run $messenger '$control '$standard '$linear_chain '$log_chain)"
+run_case "Chain Test" "($( cat "$SCRIPT_DIR/test-chain.scm" ) $run $messenger '$control '$standard '$linear_chain '$log_chain)"
 
-run_case "Tree Test" "($( cat ./test-tree.scm ) $run $messenger '$control '$standard '$tree)"
+run_case "Tree Test" "($( cat "$SCRIPT_DIR/test-tree.scm" ) $run $messenger '$control '$standard '$tree)"
 
-run_case "Ledger Test" "($( cat ./test-ledger.scm ) $run $messenger '$control '$standard '$log_chain '$tree '$config '$ledger)"
+run_case "Ledger Test" "($( cat "$SCRIPT_DIR/test-ledger.scm" ) $run $messenger '$control '$standard '$log_chain '$tree '$config '$ledger)"

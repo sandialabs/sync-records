@@ -267,7 +267,7 @@
            (stage ((self '~field) 'stage))
            (perm ((self '~field) 'perm))
            (temp ((self '~field) 'temp)))
-      ((stage 'set!) '(*state* *time*) (system-time-unix))
+      ((stage 'set!) '(*state* *time*) (system-time-utc))
       ((perm 'push!) (stage))
       ((self '~signature-sign!) perm)
       ((temp 'push!) ((perm 'get) -1))
