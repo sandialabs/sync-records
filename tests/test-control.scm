@@ -1,6 +1,6 @@
 (lambda (run-test make-messenger control-src)
   (let* ((pass (lambda (x) (append "pass-" (symbol->string x))))
-         (init (lambda (x) `(,x (,control-src ,(pass x)) "Installed control module")))
+         (init (lambda (x) `(,x (,control-src ,(pass x) #t) "Installed control module")))
          (form (lambda (x)
                  `(,(car x) (*call* ,(pass (car x)) (lambda (root) ,(cadr x))) ,@(cddr x)))))
     (run-test

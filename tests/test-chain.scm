@@ -1,6 +1,6 @@
 (lambda (run-test make-messenger control-src standard-src linear-chain-src log-chain-src)
   (let* ((pass (lambda (x) (append "pass-" (symbol->string x))))
-         (init (lambda (x) `(,x (,control-src ,(pass x)) "Installed control module")))
+         (init (lambda (x) `(,x (,control-src ,(pass x) #t) "Installed control module")))
          (install (lambda (x) `(,(car x) (*call* ,(pass (car x)) ,(cadr x)) #t)))
          (query (lambda (x)
                   `(,(car x)

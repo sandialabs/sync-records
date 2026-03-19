@@ -70,6 +70,7 @@ log_chain=$( cat "$LISP_DIR/log-chain.scm" )
 tree=$( cat "$LISP_DIR/tree.scm" )
 config=$( cat "$LISP_DIR/configuration.scm" )
 ledger=$( cat "$LISP_DIR/ledger.scm" )
+general=$( cat "$LISP_DIR/general.scm" )
 
 run_case "Control Test" "($( cat "$SCRIPT_DIR/test-control.scm" ) $run $messenger '$control)"
 
@@ -80,3 +81,5 @@ run_case "Chain Test" "($( cat "$SCRIPT_DIR/test-chain.scm" ) $run $messenger '$
 run_case "Tree Test" "($( cat "$SCRIPT_DIR/test-tree.scm" ) $run $messenger '$control '$standard '$tree)"
 
 run_case "Ledger Test" "($( cat "$SCRIPT_DIR/test-ledger.scm" ) $run $messenger '$control '$standard '$log_chain '$tree '$config '$ledger)"
+
+run_case "General Test" "($( cat "$SCRIPT_DIR/test-general.scm" ) $run $messenger '$general '$control '$standard '$log_chain '$tree '$config '$ledger)"

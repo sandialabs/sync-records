@@ -1,4 +1,4 @@
-(macro (secret)
+(macro (secret clear?)  ;; when clear? is #t, initialize empty root data; otherwise preserve existing root data
   (define transition-function
     '(lambda (*sync-state* query)
        (let* ((control-node (sync-car *sync-state*))
@@ -229,11 +229,12 @@
              (error 'unknown-function "Function not found")
              (apply (eval result) (cons root (cdr query)))))))
 
-  (let ((control-node (expression->byte-vector transition-function))
-        (secret-node (sync-hash (expression->byte-vector secret)))
-        (step-node (expression->byte-vector step))
-        (query-node (expression->byte-vector query))
-        (root-node (((eval root-code) (sync-cons (expression->byte-vector root-code) (sync-null))))))
+  (let* ((control-node (expression->byte-vector transition-function))
+         (secret-node (sync-hash (expression->byte-vector secret)))
+         (step-node (expression->byte-vector step))
+         (query-node (expression->byte-vector query))
+         (data-node (if clear? (sync-null) (sync-cdr (sync-cdr (sync-cdr (sync-cdr *sync-state*))))))
+         (root-node (((eval root-code) (sync-cons (expression->byte-vector root-code) data-node)))))
     (set! *sync-state* (sync-cons control-node (sync-cons (sync-cons step-node query-node)
                                                           (sync-cons secret-node root-node)))))
 
