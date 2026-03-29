@@ -1,4 +1,4 @@
-(macro (secret clear?)  ;; when clear? is #t, initialize empty root data; otherwise preserve existing root data
+(macro (secret clear?)
   (define transition-function
     '(lambda (*sync-state* query)
        (let* ((control-node (sync-car *sync-state*))
@@ -7,7 +7,7 @@
               (node-11 (sync-cdr node-1))
               (secret-node (sync-car node-11))
               (root-node (sync-cdr node-11))
-              (root ((eval (byte-vector->expression (sync-car root-node))) root-node)))
+              (root (sync-eval root-node #f)))
 
          (define (authenticate secret)
            (let ((secret-hash secret-node))
@@ -157,7 +157,8 @@
                                            `(,(byte-vector->expression k)
                                              ,(let ((child (dir-get node k)))
                                                 (cond ((and (sync-pair? child) (equal? (sync-car child) struct-tag)) 'object)
-                                                      ((sync-node? child) (if (sync-stub? child) 'unknown 'directory))
+                                                      ((sync-stub? child) 'unknown)
+                                                      ((sync-node? child) 'directory)
                                                       (else 'value)))))
                                          (dir-all node)))))))
 
@@ -224,10 +225,7 @@
 
   (define query
     '(lambda (root query)
-       (let ((result ((root 'get) `(control endpoint ,(car query)))))
-         (if (eq? result '(nothing))
-             (error 'unknown-function "Function not found")
-             (apply (eval result) (cons root (cdr query)))))))
+       (eval query)))
 
   (let* ((control-node (expression->byte-vector transition-function))
          (secret-node (sync-hash (expression->byte-vector secret)))

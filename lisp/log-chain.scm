@@ -49,7 +49,7 @@
     ;;   Args:
     ;;     index (integer): index to access.
     ;;   Returns:
-    ;;     chain object: proof chain with header.
+    ;;     sync node: proof chain node with header.
     (let* ((size ((self 'size)))
            (index ((self '~adjust) index size))
            (height-1 ((self '~range) 0 size))
@@ -73,8 +73,7 @@
                                            ((>= mid (cadr domain-2)) (recurse (sync-car node) start mid rest))
                                            (else (recurse (sync-cdr node) mid end
                                                           (recurse (sync-car node) start mid rest))))))))))))
-      ((eval (byte-vector->expression (self '(0))))
-       (sync-cons (self '(0)) (sync-cons (expression->byte-vector (+ index 1)) main)))))
+      (sync-cons (self '(0)) (sync-cons (expression->byte-vector (+ index 1)) main))))
 
   (define-method (digest self (index (- ((self 'size)) 1)))
     ;; Digest of proof chain at index.
@@ -194,7 +193,7 @@
     (let loop ((node (self '(1 1))) (d 0)) 
       (if (sync-null? node) node
           (let ((data (sync-car node)) (rest (sync-cdr node)))
-            (if (<= d depth) (sync-cons data (loop rest (+ depth 1)))
+            (if (<= d depth) (sync-cons data (loop rest (+ d 1)))
                 (sync-cons (sync-cut data) (loop rest (- d 1))))))))
 
   (define-method (~previous self index)

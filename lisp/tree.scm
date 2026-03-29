@@ -150,7 +150,7 @@
             ((equal? node-1 node-2) node-1)
             (else (error 'invalid-structure "Cannot merge incompatible structure")))))
 
-  (define-method (~dir-all self node)
+  (define-method (~dir-all self node values?)
     ;; Collect all keys in a directory node and whether it is fully known.
     ;;   Args:
     ;;     node (sync node): directory root node.
@@ -160,7 +160,7 @@
       (cond ((sync-null? node) '(() #t))
             ((sync-stub? node) '(() #f))
             (else (let ((left (sync-car node)) (right (sync-cdr node)))
-                    (if (byte-vector? left) `((,left) #t)
+                    (if (byte-vector? left) `((,(if values? `(,left ,right) left)) #t)
                         (let ((all-l (recurse left)) (all-r (recurse right)))
                           `(,(append (car all-l) (car all-r))
                             ,(and (cadr all-l) (cadr all-r))))))))))
@@ -210,14 +210,6 @@
     ;;     sync node: struct tag node.
     (sync-cons (sync-null) (sync-null)))
 
-  (define-method (~struct? self node)
-    ;; Check whether node is a tagged structure wrapper.
-    ;;   Args:
-    ;;     node (sync node): candidate node.
-    ;;   Returns:
-    ;;     boolean: True/False if node is a struct wrapper.
-    (and (sync-pair? node) (equal? (sync-car node) ((self '~struct-tag)))))
-
   (define-method (~r-read self path)
     ;; Read raw node at path without decoding.
     ;;   Args:
@@ -248,31 +240,37 @@
   (define-method (obj->node self obj)
     ;; Encode an object into a sync node representation.
     ;;   Args:
-    ;;     obj (any): value to encode.
+    ;;     obj (list): wrapped value to encode.
     ;;   Returns:
     ;;     sync node: encoded value node.
-    (cond ((sync-node? obj) obj)
-          ((procedure? obj) (sync-cons ((self '~struct-tag)) (obj)))
-          ((byte-vector? obj) (append #u(0) obj)) 
-          (else (append #u(1) (expression->byte-vector obj)))))
+    (let ((type (cadr obj))
+          (value (caddr obj)))
+      (case type
+        ((node) value)
+        ((struct) (sync-cons ((self '~struct-tag)) value))
+        ((bytes) (append #u(0) value))
+        ((expr) (append #u(1) (expression->byte-vector value)))
+        (else (error 'value-error "Wrapped tree value type is invalid")))))
 
   (define-method (node->obj self node)
-    ;; Decode a sync node into an object.
+    ;; Decode a sync node into the internal wrapped tree-value form.
     ;;   Args:
     ;;     node (sync node): encoded node.
     ;;   Returns:
-    ;;     any: decoded value or thunk for struct.
-    (cond ((byte-vector? node)
-           (case (node 0)
-             ((0) (subvector node 1))
-             ((1) (byte-vector->expression (subvector node 1)))
-             (else (error 'invalid-type "Type encoding unrecognized"))))
-          ((sync-null? node) node)
-          ((sync-stub? node) node)
-          ((sync-pair? node)
-           (if (not ((self '~struct?) node)) node
-               (lambda () (sync-cdr node))))
-          (else (error 'invalid-type "Invalid value type"))))
+    ;;     list: wrapped decoded value.
+    (let* ((struct-d (sync-digest ((self '~struct-tag))))
+           (struct? (lambda (x) (and (sync-pair? x) (equal? (sync-digest (sync-car x)) struct-d)))))
+      (cond ((byte-vector? node)
+             (case (node 0)
+               ((0) `(*tree* bytes ,(subvector node 1)))
+               ((1) `(*tree* expr ,(byte-vector->expression (subvector node 1))))
+               (else (error 'invalid-type "Type encoding unrecognized"))))
+            ((sync-null? node) `(*tree* node ,node))
+            ((sync-stub? node) `(*tree* node ,node))
+            ((sync-pair? node)
+             (if (not (struct? node)) `(*tree* node ,node)
+                 `(*tree* struct ,(sync-cdr node))))
+            (else (error 'invalid-type "Invalid value type")))))
 
   (define-method (get self path)
     ;; Get value at path, decoding node types and directory info.
@@ -280,22 +278,26 @@
     ;;     path (list of keys): path segments.
     ;;   Returns:
     ;;     any: value, '(nothing), '(unknown), or '(directory ((key type) ...) known?).
-    (let ((path (map (self '~key->bytes) path)))
-      (let ((obj ((self 'node->obj) ((self '~r-read) path))))
-        (if (sync-node? obj)
-            (cond ((sync-null? obj) '(nothing))
-                  ((sync-stub? obj) '(unknown))
-                  (else (let ((all ((self '~dir-all) obj)))
-                          `(directory ,(map (lambda (k)
-                                              `(,((self '~bytes->key) k)
-                                                ,(let ((child ((self '~dir-get) obj k)))
-                                                   (cond (((self '~struct?) child) 'object)
-                                                         ((sync-node? child) (if (sync-stub? child) 'unknown 'directory))
-                                                         (else 'value)))))
-                                            (car all))
-                                      ,(cadr all)))))
-            (cond ((procedure? obj) (obj))
-                  (else obj))))))
+    (let* ((path (map (self '~key->bytes) path))
+           (struct-d (sync-digest ((self '~struct-tag))))
+           (struct? (lambda (x) (and (sync-pair? x) (equal? (sync-digest (sync-car x)) struct-d)))))
+      (let* ((obj ((self 'node->obj) ((self '~r-read) path)))
+             (type (cadr obj))
+             (value (caddr obj)))
+        (case type
+          ((node)
+           (cond ((sync-null? value) '(nothing))
+                 ((sync-stub? value) '(unknown))
+                 (else (let ((all ((self '~dir-all) value #t)))
+                         `(directory ,(map (lambda (i)
+                                             `(,((self '~bytes->key) (car i))
+                                               ,(cond ((struct? (cadr i)) 'object)
+                                                      ((sync-stub? (cadr i)) 'unknown)
+                                                      ((sync-node? (cadr i)) 'directory)
+                                                      (else 'value))))
+                                           (car all))
+                                     ,(cadr all))))))
+          (else value)))))
 
   (define-method (equal? self source path)
     ;; Compare raw nodes at two paths for exact equality.
@@ -343,7 +345,9 @@
                          (let ((child (loop ((self '~dir-get) node (car path)) (cdr path))))
                            (if (equal? child ((self '~dir-new))) ((self '~dir-delete) node (car path))
                                ((self '~dir-set) node (car path) child))))))))
-          (else (let ((content (if (sync-node? value) (lambda () value) value)))
+          (else (let ((content (cond ((sync-node? value) `(*tree* struct ,value))
+                                     ((byte-vector? value) `(*tree* bytes ,value))
+                                     (else `(*tree* expr ,value)))))
                   ((self '~r-write!) (map (self '~key->bytes) path) ((self 'obj->node) content))))))
 
   (define-method (copy! self source path)
@@ -379,12 +383,14 @@
     ;;     path (list of keys): path segments.
     ;;   Returns:
     ;;     boolean: #t after slice.
-    (let ((path (map (self '~key->bytes) path)))
+    (let* ((path (map (self '~key->bytes) path))
+           (struct-d (sync-digest ((self '~struct-tag))))
+           (struct? (lambda (x) (and (sync-pair? x) (equal? (sync-digest (sync-car x)) struct-d)))))
       (set! (self '(1))
             (let loop ((node (self '(1))) (path path))
               (cond ((null? path) node)
                     ((byte-vector? node) node)
-                    (((self '~struct?) node) node)
+                    ((struct? node) node)
                     (else (let ((key (car path)))
                             ((self '~dir-slice) ((self '~dir-set) node key (loop ((self '~dir-get) node key) (cdr path)))
                              key))))))))
@@ -395,7 +401,10 @@
     ;;     other (tree): other tree.
     ;;   Returns:
     ;;     boolean: #t on success, #f if not mergeable.
-    (let ((node-1 (self '(1))) (node-2 (other '(1))))
+    (let* ((node-1 (self '(1)))
+           (node-2 ((sync-eval other #f) '(1)))
+           (struct-d (sync-digest ((self '~struct-tag))))
+           (struct? (lambda (x) (and (sync-pair? x) (equal? (sync-digest (sync-car x)) struct-d)))))
       (if (or (sync-null? node-1) (not (equal? (sync-digest node-1) (sync-digest node-2)))) #f
           (set! (self '(1))
                 (let loop-1 ((n-1 node-1) (n-2 node-2))
@@ -404,7 +413,7 @@
                         ((sync-null? n-2) n-1)
                         ((sync-stub? n-1) n-2)
                         ((sync-stub? n-2) n-1)
-                        (((self '~struct?) n-1) n-1)
+                        ((struct? n-1) n-1)
                         (else (let ((n-3 ((self '~dir-merge) n-1 n-2)))
                                 (let loop-2 ((n-3 n-3) (keys (car ((self '~dir-all) n-3))))
                                   (if (null? keys) n-3
@@ -419,13 +428,15 @@
     ;; Validate internal directory structure of the whole tree.
     ;;   Returns:
     ;;     boolean: True/False if tree structure is valid.
-    (let loop-1 ((node (self '(1))))
-      (cond ((sync-null? node) #t)
-            ((sync-stub? node) #t)
-            ((byte-vector? node) #t)
-            (((self '~struct?) node) #t)
-            ((not ((self '~dir-valid?) node)) #f)
-            (else (let loop-2 ((keys (car ((self '~dir-all) node))))
-                    (if (null? keys) #t
-                        (if (not (loop-2 (cdr keys))) #f
-                            (loop-1 ((self '~dir-get) node (car keys)))))))))))
+    (let* ((struct-d (sync-digest ((self '~struct-tag))))
+           (struct? (lambda (x) (and (sync-pair? x) (equal? (sync-digest (sync-car x)) struct-d)))))
+      (let loop-1 ((node (self '(1))))
+        (cond ((sync-null? node) #t)
+              ((sync-stub? node) #t)
+              ((byte-vector? node) #t)
+              ((struct? node) #t)
+              ((not ((self '~dir-valid?) node)) #f)
+              (else (let loop-2 ((keys (car ((self '~dir-all) node))))
+                      (if (null? keys) #t
+                          (if (not (loop-2 (cdr keys))) #f
+                              (loop-1 ((self '~dir-get) node (car keys))))))))))))

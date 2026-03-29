@@ -29,25 +29,34 @@ You can now run the test by providing `test.sh` by passing in access to the SDK.
 
 ## Develop
 
-This test suite supports testing of multiple journals within a discrete and deterministic framework.
-The top-level `test.sh` file leverages synchronic web primitives to convert actions and communications between multiple simulated journals into a single lisp-style expression that the SDK can evaluate.
-The `*-test.scm` within this directory contain logic for generating and executing scripted actions among multiple journals.
-To maximize flexibility, the contents of each `*-test.scm` is actually a function that accepts the following inputs:
+The current test suite is mostly built around direct source-driven harnesses.
+The top-level `test.sh` file loads the active module source files from `lisp/`, passes them into each `test-*.scm` lambda, and evaluates the resulting expression with the Journal SDK.
 
-- `run-test` a function `(lambda (script) ...)` that takes a test script and runs it
-- `make-messenger` a function `(lambda (journal) ...)` that takes a journal name (symbol) and returns a function `(lambda (message) ...)` for sending messages to the journal
-- `record-src` the source code for the `record.scm` interface
-- `record-src` the source code for the `control.scm` function required by `record.scm`
-- `...` other test-specific arguments (e.g., more source code) required to run the test
+Each active `test-*.scm` file is a Scheme function that accepts the source blobs it needs, instantiates local objects or journals, and returns either:
 
-In general, `test-*.scm` functions can run arbitrary code to compute and format the desired test script.
-Eventually, the script that is passed into `run-test` must be a list where each item is itself a list with the following elements in order:
+- a success string of the form `"Success (N checks)"`
+- or an `(error ...)` form if an assertion fails
 
-1. `journal`: a symbol refering to the simulated journal
-2. `query`: the query to be evaluated by the simulated journal
-3. `condition`: (optional) a function or expression to check the output
+Most tests now use a direct style:
 
-If the condition is a function, it must have the form `(lambda (result) ...)` to accept the returned result of the query and return an output indicating whether the script action succeeds or fails.
-If the condition is an expression, it will be compared against the result to determine success or failure using the `equals?` function.
-If the condition is omitted, then the script action is assumed to succeed.
-A test passes if all of the individual script actions succeed.
+- `test-standard.scm`, `test-tree.scm`, and `test-chain.scm`
+  - instantiate the needed classes locally with `standard.scm`
+  - explicitly `(sync-eval node #f)` constructed nodes when a live object is needed
+  - run assertions directly in one evaluation
+
+- `test-ledger.scm`
+  - simulates multiple local ledgers inside one evaluation
+  - coordinates them directly without real journal transport
+
+- `test-interface.scm`
+  - creates multiple real journals with `sync-create`
+  - installs `interface.scm` into each journal
+  - monkey-patches transport details inside the test so cross-journal flows remain deterministic
+
+When adding a new test, prefer the direct lambda style used by the active suite:
+
+1. accept only the source blobs the test actually needs
+2. instantiate objects or journals locally inside the test
+3. use `standard 'make` for uninitialized shells and `standard 'init` when constructor args are required; use `(sync-eval node #f)` only when a live object is needed
+4. use a small local `assert` helper/macro
+5. return a compact success string when all checks pass

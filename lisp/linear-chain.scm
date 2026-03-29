@@ -25,11 +25,10 @@
     ;;   Args:
     ;;     index (integer): index to access.
     ;;   Returns:
-    ;;     chain object: proof chain with header.
+    ;;     sync node: proof chain node with header.
     (let* ((index ((self '~adjust) index))
            (main (self (make-list (+ (- ((self 'size)) index) 1) 1))))
-      ((eval (byte-vector->expression (self '(0))))
-       (sync-cons (self '(0)) (sync-cons (expression->byte-vector (+ index 1)) main)))))
+      (sync-cons (self '(0)) (sync-cons (expression->byte-vector (+ index 1)) main))))
 
   (define-method (digest self (index (- ((self 'size)) 1)))
     ;; Digest of proof chain at index.
@@ -37,7 +36,7 @@
     ;;     index (integer): index to access.
     ;;   Returns:
     ;;     byte-vector: digest.
-    (sync-digest (((self 'previous) index))))
+    (sync-digest ((self 'previous) index)))
 
   (define-method (size self)
     ;; Return number of elements in the chain.

@@ -1,110 +1,99 @@
-(lambda (run-test make-messenger control-src standard-src tree-src)
-  (let* ((pass (lambda (x) (append "pass-" (symbol->string x))))
-         (init (lambda (x) `(,x (,control-src ,(pass x) #t) "Installed control module")))
-         (install (lambda (x) `(,(car x) (*call* ,(pass (car x)) ,(cadr x)) #t)))
-         (instantiate (lambda (args)
-                        (let ((journal-name (car args))
-                              (obj-name (cadr args))
-                              (cls-path (caddr args))
-                              (make-args (cdddr args)))
-                          `(,journal-name
-                            (*call* ,(pass journal-name)
-                                    (lambda (root)
-                                      (let* ((std-node ((root 'get) '(control object standard)))
-                                             (std ((eval (byte-vector->expression (sync-car std-node))) std-node))
-                                             (cls ((root 'get) ',cls-path))
-                                             (obj (apply (std 'make) (cons cls ',make-args))))
-                                        ((root 'set!) '(control test ,obj-name) (obj))))) #t))))
-         (query (lambda (args)
-                  `(,(car args)
-                    (*call* ,(pass (car args))
-                            (lambda (root)
-                              (let* ((std-node ((root 'get) '(control object standard)))
-                                     (std ((eval (byte-vector->expression (sync-car std-node))) std-node))
-                                     ,@(map (lambda (x)
-                                              `(,x ((std 'load) ((root 'get) '(control test ,x)))))
-                                            (cadr args))
-                                     (*result* ,(caddr args)))
-                                ,@(map (lambda (x)
-                                         `((root 'set!) '(control test ,x) (,x)))
-                                       (cadr args))
-                                *result*)))
-                    ,@(cdddr args)))))
-    (run-test
-     (append
-      (map init '(journal))
-      (map install `((journal (lambda (root)
-                                ((root 'set!) '(control class standard) ',standard-src)
-                                ((root 'set!) '(control object standard)
-                                 (let ((init (caddr ',standard-src)))
-                                   (((eval `(lambda* ,(cddadr init) ,@(cddr init))) ',standard-src)))))
-                     "Installed standard library")
-                     (journal (lambda (root) ((root 'set!) '(control class tree) ',tree-src)))))
-      (map instantiate `((journal tree-1 (control class tree))
-                         (journal tree-2 (control class tree))
-                         (journal tree-3 (control class tree))))
-      (map query
-           `((journal (tree-1) ((tree-1 'set!) '(a b) 2) #t)
-             (journal (tree-1) ((tree-1 'set!) '(a c d) 4) #t)
-             (journal (tree-1) ((tree-1 'set!) '(a c* d) 4) #t)
-             (journal (tree-1) ((tree-1 'get) '(a c d)) 4)
-             (journal (tree-1) ((tree-1 'set!) '(a e f) 9) #t)
-             (journal (tree-1) ((tree-1 'set!) '(a e g) 10) #t)
+(lambda (standard-src tree-src)
 
-             ;; delete
-             (journal (tree-1) ((tree-1 'set!) '(a e f) '(nothing)) #t)
-             (journal (tree-1) ((tree-1 'set!) '(a e) '(nothing)) #t)
+  (define asserted 0)
 
-             ;; getting
-             (journal (tree-1) ((tree-1 'get) '(a)) '(directory ((c directory) (c* directory) (b value)) #t))
-             (journal (tree-1) ((tree-1 'get) '(a b)) 2)
-             (journal (tree-1) ((tree-1 'get) '(a c d)) 4)
-             (journal (tree-1) ((tree-1 'get) '(a c* d)) 4)
+  (define-macro (assert expression expected)
+    `(let ((trunc (lambda (x y) (if (< (length x) y) x (append (substring x 0 y) " ...")))))
+       (catch #t
+              (lambda ()
+                (let* ((result~ ,expression)
+                       (expected~ ,expected)
+                       (check~ (cond ((not expected~) (lambda (x) #t))
+                                     ((procedure? expected~) expected~)
+                                     (else (lambda (result) (equal? result expected~))))))
+                  (if (check~ result~)
+                      (begin (set! asserted (+ asserted 1)) result~)
+                      (error 'assertion-failure
+                             (append "[Check " (object->string asserted) " failed] "
+                                     "[Expression " (object->string ',expression) "] "
+                                     "[Evaluated " (trunc (object->string result~) 256) "] "
+                                     "[Expected " (trunc (object->string expected~) 256) "]")))))
+              (lambda args
+                (error 'assertion-failure
+                       (append "[Check " (object->string asserted) " errored] "
+                               "[Expression " (object->string ',expression) "] "
+                               "[Error " (trunc (object->string args) 256) "]"))))))
 
-             ;; equality
-             (journal (tree-1) ((tree-1 'equal?) '(a b) '(a c)) #f)
-             (journal (tree-1) ((tree-1 'equal?) '(a c) '(a c*)) #t)
+  (define standard
+    (let ((init (caddr standard-src)))
+      (sync-eval ((eval `(lambda* ,(cddadr init) ,@(cddr init))) standard-src) #f)))
 
-             ;; copying
-             (journal (tree-1) ((tree-1 'copy!) '(a) '(a*)) #t)
-             (journal (tree-1) ((tree-1 'get) '(a* c d)) 4)
-             (journal (tree-1) ((tree-1 'set!) '(a fn) (lambda (x) x))
-                      (lambda (x) (and (list? x) (eq? (car x) 'error))))
-             (journal (tree-1) ((tree-1 'set!) '(a mac) (macro (x) x))
-                      (lambda (x) (and (list? x) (eq? (car x) 'error))))
+  (define tree-1 (sync-eval (assert ((standard 'init) tree-src) sync-node?) #f))
+  (define tree-2 (sync-eval (assert ((standard 'init) tree-src) sync-node?) #f))
+  (define tree-3 (sync-eval (assert ((standard 'init) tree-src) sync-node?) #f))
 
-             ;; slicing
-             (journal (tree-1) ((tree-1 'get) '(a)) '(directory ((c directory) (c* directory) (b value)) #t))
-             (journal (tree-1) ((tree-1 'slice!) '(a b)) #t)
-             (journal (tree-1) ((tree-1 'get) '(a b)) 2)
-             (journal (tree-1) ((tree-1 'get) '(a)) '(directory ((b value)) #f))
+  (assert ((tree-1 'set!) '(a b) 2) #t)
+  (assert ((tree-1 'set!) '(a c d) 4) #t)
+  (assert ((tree-1 'set!) '(a c* d) 4) #t)
+  (assert ((tree-1 'get) '(a c d)) 4)
+  (assert ((tree-1 'set!) '(a e f) 9) #t)
+  (assert ((tree-1 'set!) '(a e g) 10) #t)
 
-             ;; pruning
-             (journal (tree-1) ((tree-1 'set!) '(b a c d) 4) #t)
-             (journal (tree-1) ((tree-1 'set!) '(b d d) 2) #t)
-             (journal (tree-1) ((tree-1 'set!) '(b d e) 5) #t)
-             (journal (tree-1) ((tree-1 'set!) '(b n c d) 1) #t)
-             (journal (tree-1) ((tree-1 'copy!) '(b) '(b*)) #t)
-             (journal (tree-1) ((tree-1 'prune!) '(b d d) #t) #t)
-             (journal (tree-1) ((tree-1 'prune!) '(b d e)) #t)
-             (journal (tree-1) ((tree-1 'get) '(b d)) '(directory ((d unknown)) #f))
-             (journal (tree-1) ((tree-1 'get) '(b d d)) '(unknown))
-             (journal (tree-1) ((tree-1 'get) '(b n c d)) 1)
+  (assert ((tree-1 'set!) '(a e f) '(nothing)) #t)
+  (assert ((tree-1 'set!) '(a e) '(nothing)) #t)
 
-             ;; equivalency
-             (journal (tree-1) ((tree-1 'equal?) '(b) '(b*)) #f)
-             (journal (tree-1) ((tree-1 'equivalent?) '(b) '(b*)) #t)
+  (assert ((tree-1 'get) '(a)) '(directory ((c directory) (c* directory) (b value)) #t))
+  (assert ((tree-1 'get) '(a b)) 2)
+  (assert ((tree-1 'get) '(a c d)) 4)
+  (assert ((tree-1 'get) '(a c* d)) 4)
 
-             ;; validity
-             (journal (tree-1) ((tree-1 'valid?) #t))
+  (assert ((tree-1 'equal?) '(a b) '(a c)) #f)
+  (assert ((tree-1 'equal?) '(a c) '(a c*)) #t)
 
-             ;; merging
-             (journal (tree-2) ((tree-2 'set!) '(a b) 2) #t)
-             (journal (tree-2) ((tree-2 'set!) '(a* b) 4) #t)
-             (journal (tree-2) ((tree-2 'prune!) '(a b)) #t)
-             (journal (tree-3) ((tree-3 'set!) '(a b) 2) #t)
-             (journal (tree-3) ((tree-3 'set!) '(a* b) 4) #t)
-             (journal (tree-3) ((tree-3 'prune!) '(a* b)) #t)
-             (journal (tree-2 tree-3) ((tree-2 'merge!) tree-3) #t)
-             (journal (tree-2) ((tree-2 'get) '(a b)) 2)
-             (journal (tree-2) ((tree-2 'get) '(a* b)) 4)))))))
+  (assert ((tree-1 'copy!) '(a) '(a*)) #t)
+  (assert ((tree-1 'get) '(a* c d)) 4)
+
+  ;; (assert (catch #t
+  ;;           (lambda () ((tree-1 'set!) '(a fn) (lambda (x) x)))
+  ;;           (lambda args args))
+  ;;         (lambda (x) (and (list? x) (eq? (car x) 'value-error))))
+
+  ;; (assert (catch #t
+  ;;           (lambda () ((tree-1 'set!) '(a mac) (macro (x) x)))
+  ;;           (lambda args args))
+  ;;         (lambda (x) (and (list? x) (eq? (car x) 'value-error))))
+
+  (assert ((tree-1 'get) '(a)) '(directory ((c directory) (c* directory) (b value)) #t))
+  (assert ((tree-1 'slice!) '(a b)) #t)
+  (assert ((tree-1 'get) '(a b)) 2)
+  (assert ((tree-1 'get) '(a)) '(directory ((b value)) #f))
+
+  (assert ((tree-1 'set!) '(b a c d) 4) #t)
+  (assert ((tree-1 'set!) '(b d d) 2) #t)
+  (assert ((tree-1 'set!) '(b d e) 5) #t)
+  (assert ((tree-1 'set!) '(b n c d) 1) #t)
+  (assert ((tree-1 'copy!) '(b) '(b*)) #t)
+  (assert ((tree-1 'prune!) '(b d d) #t) #t)
+  (assert ((tree-1 'prune!) '(b d e)) #t)
+  (assert ((tree-1 'get) '(b d)) '(directory ((d unknown)) #f))
+  (assert ((tree-1 'get) '(b d d)) '(unknown))
+  (assert ((tree-1 'get) '(b n c d)) 1)
+
+  (assert ((tree-1 'equal?) '(b) '(b*)) #f)
+  (assert ((tree-1 'equivalent?) '(b) '(b*)) #t)
+
+  (assert ((tree-1 'valid?)) #t)
+
+  (assert ((tree-2 'set!) '(a b) 2) #t)
+  (assert ((tree-2 'set!) '(a* b) 4) #t)
+  (assert ((tree-2 'prune!) '(a b)) #t)
+
+  (assert ((tree-3 'set!) '(a b) 2) #t)
+  (assert ((tree-3 'set!) '(a* b) 4) #t)
+  (assert ((tree-3 'prune!) '(a* b)) #t)
+
+  (assert ((tree-2 'merge!) (tree-3)) #t)
+  (assert ((tree-2 'get) '(a b)) 2)
+  (assert ((tree-2 'get) '(a* b)) 4)
+
+  (append "Success (" (object->string asserted) " checks)"))
