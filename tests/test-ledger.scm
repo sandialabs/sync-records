@@ -129,8 +129,14 @@
   (assert ((ledger-1 'set!) '((*state* do pin this)) "yes") #t)
   (assert ((ledger-1 'set!) '((*state* do pin that)) "yes") #t)
   (assert ((ledger-1 'set!) '((*state* do not pin)) "no") #t)
+  (assert ((ledger-1 'set-batch!)
+           '(((*state* batch alpha))
+             ((*state* batch beta)))
+           '("a" "b")) #t)
   (assert ((ledger-1 'get) '((*state* do not pin))) "no")
   (assert ((ledger-1 'get) '((*state* do pin))) '(directory ((this value) (that value)) #t))
+  (assert ((ledger-1 'get) '((*state* batch alpha))) "a")
+  (assert ((ledger-1 'get) '((*state* batch beta))) "b")
 
   (assert (step-all! ledger-1) '(2))
 

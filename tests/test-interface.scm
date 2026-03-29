@@ -83,6 +83,17 @@
   (let ((query '((function get) (arguments ((path ((*state* hello))))))))
     (assert (interface-query journal-1 interface-1 query) "world"))
 
+  (let ((query '((function set-batch!)
+                 (arguments ((paths (((*state* batch alpha)) ((*state* batch beta))))
+                             (values ("a" "b")))))))
+    (assert (interface-query journal-1 interface-1 query) #t))
+
+  (let ((query '((function get) (arguments ((path ((*state* batch alpha))))))))
+    (assert (interface-query journal-1 interface-1 query) "a"))
+
+  (let ((query '((function get) (arguments ((path ((*state* batch beta))))))))
+    (assert (interface-query journal-1 interface-1 query) "b"))
+
   (let ((query '((function *step!*))))
     (assert (interface-query journal-1 interface-1 query) 1))
 

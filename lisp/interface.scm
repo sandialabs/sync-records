@@ -242,7 +242,7 @@
                       ((bridge!) (~authenticate) (apply bridge! keyword-args))
                       ((bridge-synchronize!) (~authenticate) (apply bridge-synchronize! keyword-args))
                       ((*step!*) (~authenticate) (apply *step!* keyword-args))
-                      ((set! unpin!) (~authenticate) (~method))
+                      ((set! set-batch! unpin!) (~authenticate) (~method))
                       ((size synchronize info config get) (~method))
                       (else (error 'api-error "Interface does not implement API endpoint")))))
            ((root 'set!) '(control object ledger) (ledger))

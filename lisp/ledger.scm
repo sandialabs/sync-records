@@ -65,9 +65,19 @@
     ;;   Returns:
     ;;     boolean: #t after staging.
     ((self '~path-check) path #t #t)
-    (let ((standard (sync-eval ((self '~field!) 'standard) #f))
-          (stage ((self '~field!) 'stage)))
-      ((self '~field!) 'stage ((standard 'deep-set!) stage path value))))
+    (if (> (length path) 2)
+        (let ((standard (sync-eval ((self '~field!) 'standard) #f))
+              (stage ((self '~field!) 'stage)))
+          ((self '~field!) 'stage ((standard 'deep-set!) stage path value)))
+        (let ((stage-obj (sync-eval ((self '~field!) 'stage) #f)))
+          ((stage-obj 'set!) (car path) value)
+          ((self '~field!) 'stage (stage-obj)))))
+
+  (define-method (set-batch! self paths values)
+    (map (lambda (path) ((self '~path-check) path #t #t)) paths)
+    (let ((stage-obj (sync-eval ((self '~field!) 'stage) #f)))
+      ((stage-obj 'set-batch!) (map car paths) values)
+      ((self '~field!) 'stage (stage-obj))))
 
   (define-method (resolve self path pinned? proof? head)
     ;; Get value at path, optionally with proof details.

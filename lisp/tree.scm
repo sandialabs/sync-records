@@ -350,6 +350,9 @@
                                      (else `(*tree* expr ,value)))))
                   ((self '~r-write!) (map (self '~key->bytes) path) ((self 'obj->node) content))))))
 
+  (define-method (set-batch! self paths values)
+    (map (lambda (path value) ((self 'set!) path value)) paths values) #t)
+
   (define-method (copy! self source path)
     ;; Copy raw node from source path to target path.
     ;;   Args:
