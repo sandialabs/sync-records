@@ -14,6 +14,9 @@
   (define (set-query function)
     (sync-call `(*set-query* ,secret-1 ,function) #t))
 
+  (define (set-step function)
+    (sync-call `(*set-step* ,secret-1 ,function) #t))
+
   ;; install and instantiate standard library
   (call `(lambda (root)
            (let ((init (caddr ,standard)))
@@ -198,36 +201,6 @@
                       (args `((name ,name) (interface ,interface) (info ,info))))
                  (~self-call 'bridge! args #t))))
 
-         (define* (bridge-synchronize! (name (error 'arg-error "Missing arg: name")) index response)
-           ;; Synchronize a bridge, optionally using a provided remote response.
-           ;;   Args:
-           ;;     name (symbol): bridge name.
-           ;;     index (integer): optional last synchronized index.
-           ;;     response (expression): optional serialized sync response.
-           ;;   Returns:
-           ;;     boolean: #t after synchronization.
-           (if (and index response) ((ledger 'bridge-synchronize!) name index response)
-               (let* ((last ((ledger 'get) `((*bridge* ,name chain))))
-                      (index (if (sync-node? last) (- (((sync-eval last #f) 'size)) 1) -1))
-                      (interface ((ledger 'config) `(private bridge ,name interface)))
-                      (response (sync-remote interface `((function synchronize) (arguments ((index ,index))))))
-                      (args `((name ,name) (index ,index) (response ,response))))
-                 (~self-call 'bridge-synchronize! args #t))))
-
-         (define* (*step!* mutate?)
-           ;; Run one interface step, optionally mutating the local ledger at the end.
-           ;;   Args:
-           ;;     mutate? (boolean): #t to perform the final local step.
-           ;;   Returns:
-           ;;     integer: resulting ledger size.
-           (if mutate? (begin ((ledger 'step!) (system-time-unix)) ((ledger 'size)))
-               (let loop ((names (map car ((ledger 'config) '(private bridge)))))
-                 (if (null? names)
-                     (~self-call '*step!* '((mutate? #t)) #t)
-                     (begin
-                       (~self-call 'bridge-synchronize! `((name ,(car names))) #f)
-                       (loop (cdr names)))))))
-
          (define (~method)
            (let ((result (apply (ledger (cadr func)) keyword-args)))
              result))
@@ -240,8 +213,6 @@
                       ((trace) (apply trace keyword-args))
                       ((pin!) (~authenticate) (apply pin! keyword-args))
                       ((bridge!) (~authenticate) (apply bridge! keyword-args))
-                      ((bridge-synchronize!) (~authenticate) (apply bridge-synchronize! keyword-args))
-                      ((*step!*) (~authenticate) (apply *step!* keyword-args))
                       ((set! set-batch! unpin!) (~authenticate) (~method))
                       ((size synchronize info config get) (~method))
                       (else (error 'api-error "Interface does not implement API endpoint")))))
@@ -257,5 +228,59 @@
                 (if (null? queries) (reverse result)
                     (let ((subquery (if auth (append (car queries) auth) (car queries)))) 
                       (loop (cdr queries) (cons (query-once subquery) result))))))))))
+  (define step-once
+    '(lambda (root secret query)
+       (let* ((query (if (null? query) '(ledger-step) query))
+              (std-node ((root 'get) '(control object standard)))
+              (standard (sync-eval std-node #f))
+              (node ((root 'get) '(control object ledger)))
+              (ledger (sync-eval node #f)))
+
+         ;; --- query helpers ---
+
+         (define (~self-call blocking? query)
+           (sync-call `(*step* ,secret ,query) blocking?))
+
+         ;; --- handlers ---
+
+         (define* (bridge-synchronize! (name (error 'arg-error "Missing arg: name")) index response)
+           ;; Synchronize a bridge, optionally using a provided remote response.
+           ;;   Args:
+           ;;     name (symbol): bridge name.
+           ;;     index (integer): optional last synchronized index.
+           ;;     response (expression): optional serialized sync response.
+           ;;   Returns:
+           ;;     boolean: #t after synchronization.
+           (if (and index response) ((ledger 'bridge-synchronize!) name index response)
+               (let* ((last ((ledger 'get) `((*bridge* ,name chain))))
+                      (index (if (sync-node? last) (- (((sync-eval last #f) 'size)) 1) -1))
+                      (interface ((ledger 'config) `(private bridge ,name interface)))
+                      (response (sync-remote interface `((function synchronize) (arguments ((index ,index)))))))
+                 (~self-call #t `(bridge-synchronize! ,name ,index ,response)))))
+
+         (define* (ledger-step mutate?)
+           ;; Run one interface step, optionally mutating the local ledger at the end.
+           ;;   Args:
+           ;;     mutate? (boolean): #t to perform the final local step.
+           ;;   Returns:
+           ;;     integer: resulting ledger size.
+           (if mutate? (begin ((ledger 'step!) (system-time-unix)) ((ledger 'size)))
+               (let loop ((names (map car ((ledger 'config) '(private bridge)))))
+                 (if (null? names)
+                     (~self-call #t '(ledger-step #t))
+                     (begin
+                       (~self-call #f `(bridge-synchronize! ,(car names)))
+                       (loop (cdr names)))))))
+
+         ;; --- dispatch ---
+
+         (let ((ret (case (car query)
+                      ((ledger-step) (apply ledger-step (cdr query)))
+                      ((bridge-synchronize!) (apply bridge-synchronize! (cdr query)))
+                      (else (error 'api-error "Step does not implement operation")))))
+           ((root 'set!) '(control object ledger) (ledger))
+           ret))))
+
+  (set-step step-once)
 
   "Installed interface")

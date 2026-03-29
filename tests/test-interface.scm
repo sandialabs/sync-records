@@ -51,6 +51,9 @@
   (define (interface-query journal interface query)
     (journal-query journal (append query `((authentication ,interface)))))
 
+  (define (admin-step journal secret)
+    (journal-query journal `(*step* ,secret)))
+
   (define interface-1 "http://journal-1.test/interface")
   (define interface-2 "http://journal-2.test/interface")
   (define interface-3 "http://journal-3.test/interface")
@@ -94,8 +97,7 @@
   (let ((query '((function get) (arguments ((path ((*state* batch beta))))))))
     (assert (interface-query journal-1 interface-1 query) "b"))
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-1 interface-1 query) 1))
+  (assert (admin-step journal-1 "pass-1") 1)
 
   (let ((query '((function resolve) (arguments ((path (-1 (*state* hello))) (pinned? #f) (proof? #f))))))
     (assert (interface-query journal-1 interface-1 query) "world"))
@@ -109,8 +111,7 @@
   (let ((query '((function set!) (arguments ((path ((*state* do not pin))) (value "no"))))))
     (assert (interface-query journal-1 interface-1 query) #t))
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-1 interface-1 query) 2))
+  (assert (admin-step journal-1 "pass-1") 2)
 
   (let ((query '((function pin!) (arguments ((path (1 (*state* do pin this))))))))
     (assert (interface-query journal-1 interface-1 query) #t))
@@ -124,11 +125,9 @@
   (let ((query '((function set!) (arguments ((path ((*state* a b c))) (value 42))))))
     (assert (interface-query journal-2 interface-2 query) #t))
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-2 interface-2 query) 1))
+  (assert (admin-step journal-2 "pass-2") 1)
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-1 interface-1 query) 3))
+  (assert (admin-step journal-1 "pass-1") 3)
 
   (let* ((path '(-1 (*bridge* journal-2 chain) -1 (*state* a b c)))
          (query `((function resolve) (arguments ((path ,path) (pinned? #f) (proof? #f))))))
@@ -159,43 +158,33 @@
   (let ((query '((function set!) (arguments ((path ((*state* g h i))) (value "world"))))))
     (assert (interface-query journal-5 interface-5 query) #t))
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-3 interface-3 query) 1))
+  (assert (admin-step journal-3 "pass-3") 1)
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-4 interface-4 query) 1))
+  (assert (admin-step journal-4 "pass-4") 1)
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-5 interface-5 query) 1))
+  (assert (admin-step journal-5 "pass-5") 1)
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-3 interface-3 query) 2))
+  (assert (admin-step journal-3 "pass-3") 2)
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-2 interface-2 query) 2))
+  (assert (admin-step journal-2 "pass-2") 2)
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-1 interface-1 query) 4))
+  (assert (admin-step journal-1 "pass-1") 4)
 
   (let* ((path '(-1 (*bridge* journal-3 chain) -1 (*state* d e f)))
          (query `((function resolve) (arguments ((path ,path) (pinned? #f) (proof? #f))))))
     (assert (interface-query journal-2 interface-2 query) 64))
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-2 interface-2 query) 2))
+  (assert (admin-step journal-2 "pass-2") 2)
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-1 interface-1 query) 4))
+  (assert (admin-step journal-1 "pass-1") 4)
 
   (let* ((path '(-1 (*bridge* journal-2 chain) -1 (*bridge* journal-3 chain) -1 (*state* d e f)))
          (query `((function resolve) (arguments ((path ,path) (pinned? #f) (proof? #f))))))
     (assert (interface-query journal-1 interface-1 query) 64))
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-2 interface-2 query) 2))
+  (assert (admin-step journal-2 "pass-2") 2)
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-1 interface-1 query) 4))
+  (assert (admin-step journal-1 "pass-1") 4)
 
   (let* ((path '(-1 (*bridge* journal-2 chain) -1 (*bridge* journal-3 chain) -1 (*bridge* journal-4 chain) -1 (*state* g h i)))
          (query `((function resolve) (arguments ((path ,path) (pinned? #f) (proof? #f))))))
@@ -208,26 +197,22 @@
   (let ((query '((function set!) (arguments ((path ((*state* tick))) (value 0))))))
     (assert (interface-query journal-1 interface-1 query) #t))
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-1 interface-1 query) 5))
+  (assert (admin-step journal-1 "pass-1") 5)
 
   (let ((query '((function set!) (arguments ((path ((*state* tick))) (value 1))))))
     (assert (interface-query journal-1 interface-1 query) #t))
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-1 interface-1 query) 6))
+  (assert (admin-step journal-1 "pass-1") 6)
 
   (let ((query '((function set!) (arguments ((path ((*state* tick))) (value 2))))))
     (assert (interface-query journal-1 interface-1 query) #t))
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-1 interface-1 query) 7))
+  (assert (admin-step journal-1 "pass-1") 7)
 
   (let ((query '((function set!) (arguments ((path ((*state* tick))) (value 3))))))
     (assert (interface-query journal-1 interface-1 query) #t))
 
-  (let ((query '((function *step!*))))
-    (assert (interface-query journal-1 interface-1 query) 8))
+  (assert (admin-step journal-1 "pass-1") 8)
 
   (let ((query '((function resolve) (arguments ((path (1 (*state* do pin))) (pinned? #f) (proof? #f))))))
     (assert (interface-query journal-1 interface-1 query) '(directory ((this value) (that value)) #t)))

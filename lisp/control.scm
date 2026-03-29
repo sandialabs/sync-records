@@ -22,10 +22,10 @@
            (authenticate secret)
            (eval expression))
 
-         (define (control-step secret)
+         (define* (control-step secret (query ()))
            (authenticate secret)
            (let* ((step-handler (eval (byte-vector->expression (sync-car node-10)))))
-             (update! (step-handler root secret))))
+             (update! (step-handler root secret query))))
 
          (define (control-call secret function)
            (authenticate secret)
@@ -207,21 +207,8 @@
               (else (error 'unimplemented-method "Basic record does not implement method")))))))
 
   (define step
-    '(lambda (root secret)
-       (let* ((less? (lambda (x y)
-                       (cond ((and (number? x) (number? y)) (< x y))
-                             ((and (number? x) (not (number? y))) #t)
-                             ((and (not (number? x)) (number? y)) #f)
-                             (else (string<=? (symbol->string x) (symbol->string y))))))
-              (names ((root 'get) '(control step))))
-         (let loop ((names (sort! names less?)) (rets '()))
-           (if (null? names) (reverse rets)
-               (let ((ret (sync-call `(*call* ,secret
-                                              (lambda (root)
-                                                (let* ((path '(control step ,(car names)))
-                                                       (expr ((root 'get) path)))
-                                                  ((eval expr) root)))) #t)))
-                 (loop (cdr names) (cons `(,(car names) ,ret) rets))))))))
+    '(lambda (root secret query)
+       "No operation set for step"))
 
   (define query
     '(lambda (root query)
