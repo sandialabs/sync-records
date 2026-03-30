@@ -1,12 +1,12 @@
-(macro (clear? secret-1 secret-2 window control standard chain tree ledger . classes)
+(macro (clear? secret-1 secret-2 window root standard chain tree ledger . classes)
 
   (if (or (not (string? secret-1)) (not (string? secret-2)))
       (error 'argument-error "Interface expects admin and interface secrets to be strings"))
 
-  ;; install control logic
+  ;; install root logic
   (if clear?
-      (sync-call `(,control ,secret-1 ,clear?) #t)
-      (sync-call `(*eval* ,secret-1 (,control ,secret-1 ,clear?)) #t))
+      (sync-call `(,root ,secret-1 ,clear?) #t)
+      (sync-call `(*eval* ,secret-1 (,root ,secret-1 ,clear?)) #t))
 
   (define (call function)
     (sync-call `(*call* ,secret-1 ,function) #t))
@@ -20,35 +20,35 @@
   ;; install and instantiate standard library
   (call `(lambda (root)
            (let ((init (caddr ,standard)))
-             ((root 'set!) '(control class standard) ,standard)
-             ((root 'set!) '(control object standard)
+             ((root 'set!) '(root class standard) ,standard)
+             ((root 'set!) '(root object standard)
               ((eval `(lambda* ,(cddadr init) ,@(cddr init))) ,standard)))))
 
   ;; install required classes
-  (call `(lambda (root) ((root 'set!) '(control class chain) ,chain)))
-  (call `(lambda (root) ((root 'set!) '(control class tree) ,tree)))
-  (call `(lambda (root) ((root 'set!) '(control class ledger) ,ledger)))
+  (call `(lambda (root) ((root 'set!) '(root class chain) ,chain)))
+  (call `(lambda (root) ((root 'set!) '(root class tree) ,tree)))
+  (call `(lambda (root) ((root 'set!) '(root class ledger) ,ledger)))
 
   ;; install optional classes
   (let loop ((classes classes))
     (if (null? classes) #t
-        (begin (call `(lambda (root ((root 'set!) '(control object ,(caar classes)) ,(cadadr classes)))))
+        (begin (call `(lambda (root ((root 'set!) '(root object ,(caar classes)) ,(cadadr classes)))))
                (loop (cdr classes)))))
 
   (call `(lambda (root)
-           (let* ((std-node ((root 'get) '(control object standard)))
+           (let* ((std-node ((root 'get) '(root object standard)))
                   (standard (sync-eval std-node #f))
-                  (standard-class ((root 'get) '(control class standard)))
-                  (tree-class ((root 'get) '(control class tree)))
-                  (chain-class ((root 'get) '(control class chain)))
-                  (ledger-class ((root 'get) '(control class ledger)))
+                  (standard-class ((root 'get) '(root class standard)))
+                  (tree-class ((root 'get) '(root class tree)))
+                  (chain-class ((root 'get) '(root class chain)))
+                  (ledger-class ((root 'get) '(root class ledger)))
                  (keys (crypto-generate (expression->byte-vector ,secret-2))))
              (if ,clear?
                  (let* ((config-expr `((public ((window ,,window) (public-key ,(car keys))))
                                        (private ((secret-key ,(cdr keys))))))
                         (ledger ((standard 'init) ledger-class std-node config-expr tree-class chain-class)))
-                   ((root 'set!) '(control object ledger) ledger))
-                 (let* ((ledger-old (sync-eval ((root 'get) '(control object ledger)) #f))
+                   ((root 'set!) '(root object ledger) ledger))
+                 (let* ((ledger-old (sync-eval ((root 'get) '(root object ledger)) #f))
                         (ledger (sync-eval (sync-cons (sync-car ((standard 'make) ledger-class)) (ledger-old '(1))) #f))
                         (recode (lambda (class)
                                   (let ((code (sync-car ((standard 'make) class))))
@@ -60,7 +60,7 @@
                    ((ledger 'update-code!) 'standard (recode standard-class))
                    ((ledger 'update-code!) 'tree (recode tree-class))
                    ((ledger 'update-code!) 'chain (recode chain-class))
-                   ((root 'set!) '(control object ledger) (ledger)))))))
+                   ((root 'set!) '(root object ledger) (ledger)))))))
 
   ;; define secret store
   (call `(lambda (root)
@@ -75,9 +75,9 @@
               (keyword-args (let loop ((in (reverse arg-list)) (out '()))
                               (if (null? in) out
                                   (loop (cdr in) (append `(,(symbol->keyword (caar in)) ,(cadar in)) out)))))
-              (std-node ((root 'get) '(control object standard)))
+              (std-node ((root 'get) '(root object standard)))
               (standard (sync-eval std-node #f))
-              (node ((root 'get) '(control object ledger)))
+              (node ((root 'get) '(root object ledger)))
               (ledger (sync-eval node #f)))
 
          ;; --- query helpers ---
@@ -216,7 +216,7 @@
                       ((set! set-batch! unpin!) (~authenticate) (~method))
                       ((size synchronize info config get) (~method))
                       (else (error 'api-error "Interface does not implement API endpoint")))))
-           ((root 'set!) '(control object ledger) (ledger))
+           ((root 'set!) '(root object ledger) (ledger))
            ret))))
 
   (set-query
@@ -231,9 +231,9 @@
   (define step-once
     '(lambda (root secret query)
        (let* ((query (if (null? query) '(ledger-step) query))
-              (std-node ((root 'get) '(control object standard)))
+              (std-node ((root 'get) '(root object standard)))
               (standard (sync-eval std-node #f))
-              (node ((root 'get) '(control object ledger)))
+              (node ((root 'get) '(root object ledger)))
               (ledger (sync-eval node #f)))
 
          ;; --- query helpers ---
@@ -278,7 +278,7 @@
                       ((ledger-step) (apply ledger-step (cdr query)))
                       ((bridge-synchronize!) (apply bridge-synchronize! (cdr query)))
                       (else (error 'api-error "Step does not implement operation")))))
-           ((root 'set!) '(control object ledger) (ledger))
+           ((root 'set!) '(root object ledger) (ledger))
            ret))))
 
   (set-step step-once)

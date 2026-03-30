@@ -1,4 +1,4 @@
-(lambda (control-src standard-src chain-src tree-src ledger-src interface-src)
+(lambda (root-src standard-src chain-src tree-src ledger-src interface-src)
 
   (define asserted 0)
 
@@ -42,7 +42,7 @@
 
   (define (journal-install journal admin-secret interface-secret)
     (sync-call `(,interface-src #t ,admin-secret ,interface-secret 4
-                                ,control-src ',standard-src ',chain-src ',tree-src ',ledger-src)
+                                ,root-src ',standard-src ',chain-src ',tree-src ',ledger-src)
                #t journal))
 
   (define (journal-query journal query)
@@ -238,7 +238,7 @@
   (let ((query '((function *secret*) (arguments ((secret "pass-1-new"))))))
     (assert (interface-query journal-1 interface-1 query) #t))
 
-  (let* ((expr `(,interface-src #f "pass-1" ,interface-1 2 ,control-src ',standard-src ',chain-src ',tree-src ',ledger-src))
+  (let* ((expr `(,interface-src #f "pass-1" ,interface-1 2 ,root-src ',standard-src ',chain-src ',tree-src ',ledger-src))
          (query `(*eval* "pass-1" ,expr)))
     (assert (journal-query journal-1 query) "Installed interface"))
 

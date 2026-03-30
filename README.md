@@ -5,7 +5,7 @@ This repository contains reusable record artifacts, primarily Lisp/Scheme module
 ## Contents
 
 - `lisp/`
-  - `control.scm`: Installs the root object and admin-controlled call/query/step hooks.
+  - `root.scm`: Installs the root object and admin-controlled call/query/step hooks.
   - `standard.scm`: The shared object model used by the other modules. Public object boundaries now work primarily on `sync-node` values, with explicit `(sync-eval node #f)` where a live object is needed internally. `make` builds an uninitialized shell and `init` applies `*init*` when constructor arguments are needed.
   - `tree.scm`, `linear-chain.scm`, `log-chain.scm`, `ledger.scm`, `interface.scm`: Active record modules and data structures. `ledger.scm` now stores its configuration directly rather than delegating to a separate configuration class.
   - `archive/`: Historical or auxiliary Scheme modules retained for reference.
@@ -16,7 +16,7 @@ This repository contains reusable record artifacts, primarily Lisp/Scheme module
 
 ## Usage
 
-These Scheme modules are intended to be loaded into a running Synchronic Web Journal instance, either at startup or dynamically via the API. In the current layout, `control.scm` provides the outer journal control layer and `interface.scm` installs the authenticated record interface backed by `ledger.scm` and the supporting classes.
+These Scheme modules are intended to be loaded into a running Synchronic Web Journal instance, either at startup or dynamically via the API. In the current layout, `root.scm` provides the outer journal root layer and `interface.scm` installs the authenticated record interface backed by `ledger.scm` and the supporting classes.
 
 ### Example: Using with the Journal SDK
 
@@ -28,7 +28,7 @@ These Scheme modules are intended to be loaded into a running Synchronic Web Jou
    For example:
    ```
    ./journal-sdk -e "($( cat lisp/interface.scm ) #t \"admin-pass\" \"interface-pass\" 4 \
-     '$( cat lisp/control.scm ) '$( cat lisp/standard.scm ) '$( cat lisp/log-chain.scm ) \
+     '$( cat lisp/root.scm ) '$( cat lisp/standard.scm ) '$( cat lisp/log-chain.scm ) \
      '$( cat lisp/tree.scm ) '$( cat lisp/ledger.scm ))"
    ```
 

@@ -1,4 +1,4 @@
-(lambda (control-src)
+(lambda (root-src)
   (let* ((trunc (lambda (x y) (if (< (length x) y) x (append (substring x 0 y) " ..."))))
          (test (lambda (x)
                  (let ((expected (cadr x))
@@ -16,7 +16,7 @@
          (return (lambda (x) (append "Success (" (object->string (length x)) " checks)"))))
     (return
      (map test
-          `(((sync-call '(,control-src "pass" #t) #t) "Installed control module")
+          `(((sync-call '(,root-src "pass" #t) #t) "Installed root module")
             (((root 'set!) '(a b) 2) #t)
             (((root 'set!) '(a c d) 4) #t)
             (((root 'set!) '(a c* d) 4) #t)

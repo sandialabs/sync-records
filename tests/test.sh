@@ -36,7 +36,7 @@ run_case() {
     fi
 }
 
-control=$( cat "$LISP_DIR/control.scm" )
+root=$( cat "$LISP_DIR/root.scm" )
 standard=$( cat "$LISP_DIR/standard.scm" )
 linear_chain=$( cat "$LISP_DIR/linear-chain.scm" )
 log_chain=$( cat "$LISP_DIR/log-chain.scm" )
@@ -44,7 +44,7 @@ tree=$( cat "$LISP_DIR/tree.scm" )
 ledger=$( cat "$LISP_DIR/ledger.scm" )
 interface=$( cat "$LISP_DIR/interface.scm" )
 
-run_case "Control Test" "($( cat "$SCRIPT_DIR/test-control.scm" ) '$control)"
+run_case "Root Test" "($( cat "$SCRIPT_DIR/test-root.scm" ) '$root)"
 
 run_case "Standard Test" "($( cat "$SCRIPT_DIR/test-standard.scm" ) '$standard)"
 
@@ -56,4 +56,4 @@ run_case "Log Chain Test" "($( cat "$SCRIPT_DIR/test-chain.scm" ) '$standard '$l
 
 run_case "Ledger Test" "($( cat "$SCRIPT_DIR/test-ledger.scm" ) '$standard '$log_chain '$tree '$ledger)"
 
-run_case "Interface Test" "($( cat "$SCRIPT_DIR/test-interface.scm" ) '$control '$standard '$log_chain '$tree '$ledger '$interface)"
+run_case "Interface Test" "($( cat "$SCRIPT_DIR/test-interface.scm" ) '$root '$standard '$log_chain '$tree '$ledger '$interface)"
