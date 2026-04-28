@@ -138,7 +138,18 @@
   (assert ((ledger-1 'get) '((*state* batch alpha))) "a")
   (assert ((ledger-1 'get) '((*state* batch beta))) "b")
 
+  (assert ((ledger-1 'get) '((*transition* operation))) '((path ((*state* batch beta))) (value "b")))
+  (assert ((ledger-1 'get) '((*transition* previous operation))) '((path ((*state* batch alpha))) (value "a")))
+  (assert ((ledger-1 'get) '((*transition* previous previous operation))) '((path ((*state* do not pin))) (value "no")))
+
   (assert (step-all! ledger-1) '(2))
+
+  (assert ((ledger-1 'get) '((*transition*))) '(nothing))
+
+  (assert ((ledger-1 'resolve) '(-1 (*transition* operation))) `((path ((*state* *time*)))
+                                                                 (value ,((ledger-1 'resolve) '(-1 (*state* *time*))))))
+  (assert ((ledger-1 'resolve) '(-1 (*transition* previous operation))) '((path ((*state* batch beta))) (value "b")))
+  (assert ((ledger-1 'resolve) '(-1 (*transition* previous previous operation))) '((path ((*state* batch alpha))) (value "a")))
 
   (assert (resolve ledger-1 '(-1 (*state* do pin this)) #f #f) "yes")
   (assert (resolve ledger-1 '(-1 (*state* do pin that)) #f #f) "yes")
@@ -159,6 +170,8 @@
 
   (assert (step-all! ledger-1) (lambda (x) (and (list? x) (= (car x) 3))))
   (assert (step-all! ledger-1) (lambda (x) (and (list? x) (= (car x) 4))))
+
+  (assert ((ledger-1 'resolve) '(-1 (*transition* previous previous operation))) `((path ((*bridge* ledger-2 valid?))) (value #t)))
 
   (assert (resolve ledger-1 '(-1 (*bridge*)) #f #f)
           '(directory ((ledger-2 directory)) #t))

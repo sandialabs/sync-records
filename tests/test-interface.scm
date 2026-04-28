@@ -97,6 +97,15 @@
   (let ((query '((function get) (arguments ((path ((*state* batch beta))))))))
     (assert (interface-query journal-1 interface-1 query) "b"))
 
+  (let ((query '((function get) (arguments ((path ((*transition* operation))))))))
+    (assert (interface-query journal-1 interface-1 query) '((path ((*state* batch beta))) (value "b"))))
+
+  (let ((query '((function get) (arguments ((path ((*transition* previous operation))))))))
+    (assert (interface-query journal-1 interface-1 query) '((path ((*state* batch alpha))) (value "a"))))
+
+  (let ((query '((function get) (arguments ((path ((*transition* previous previous operation))))))))
+    (assert (interface-query journal-1 interface-1 query) '((path ((*state* hello))) (value "world"))))
+
   (assert (admin-step journal-1 "pass-1") 1)
 
   (let ((query '((function resolve) (arguments ((path (-1 (*state* hello))) (pinned? #f) (proof? #f))))))
@@ -128,6 +137,9 @@
   (assert (admin-step journal-2 "pass-2") 1)
 
   (assert (admin-step journal-1 "pass-1") 3)
+
+  (let ((query '((function resolve) (arguments ((path (-1 (*transition* previous previous operation))))))))
+    (assert (interface-query journal-1 interface-1 query) '((path ((*bridge* journal-2 valid?))) (value #t))))
 
   (let* ((path '(-1 (*bridge* journal-2 chain) -1 (*state* a b c)))
          (query `((function resolve) (arguments ((path ,path) (pinned? #f) (proof? #f))))))
